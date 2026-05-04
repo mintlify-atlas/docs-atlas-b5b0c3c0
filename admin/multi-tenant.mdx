@@ -1,0 +1,119 @@
+---
+title: "Running multiple programs on one MARLO instance"
+description: "How MARLO's multi-tenant model works, what a Global Unit is, how to onboard a new program, and how data isolation is maintained across programs."
+---
+
+MARLO is built to host multiple research programs — called Global Units — on a single deployed instance. Each Global Unit operates with its own phases, roles, partners, locations, taxonomies, and feature configuration. This page explains how the multi-tenant model works, what types of Global Units exist, and what a Super Admin must configure when onboarding a new program.
+
+## What is a Global Unit?
+
+In MARLO, every research program is represented as a **Global Unit**. A Global Unit is the top-level container that scopes all of a program's data, users, and configuration.
+
+MARLO supports three types of Global Units:
+
+| Type | Description | Typical use |
+|---|---|---|
+| **CRP** (CGIAR Research Program) | Large, multi-cluster, multi-country research programs | CCAFS, AICCRA |
+| **Platform** | Cross-cutting thematic platforms with shared infrastructure | Genebanks, Excellence in Breeding |
+| **Center** | Individual CGIAR Centers operating their own reporting cycle | Alliance of Bioversity and CIAT, IITA |
+
+All three types use the same underlying data model and administration tools. The type affects which `global_unit_type_id` is used internally and which specificity definitions apply — but the onboarding process and day-to-day operation are the same.
+
+## What each Global Unit owns independently
+
+Each Global Unit has its own separate instance of:
+
+- **Phases** — the POWB, UpKeep, and Annual Report cycles for each year, including their open/close dates and status
+- **Roles and users** — role assignments are scoped per Global Unit; a user's Admin role on one program does not carry over to another
+- **Partner institutions** — the set of organizations linked to the program's clusters
+- **Locations** — countries and regions covered by the program
+- **Parameters and specificities** — feature flags and configuration values that control platform behavior for that program
+- **Taxonomies** — Strategic Locus Outcomes (SLOs), Intermediate Development Outcomes (IDOs), and cross-cutting issues are defined and managed per program
+- **Data** — all transactional data (deliverables, innovations, OICRs, planning entries) is partitioned by Global Unit
+
+Two programs on the same MARLO instance share only the underlying infrastructure (database server, Tomcat, application code). They do not share data, roles, or configuration.
+
+## How the URL structure enforces scope
+
+Every URL in MARLO includes the Global Unit's acronym as a path segment. This scoping is validated by interceptors on every request.
+
+```
+/projects/{crp}/description.do
+/powb/{crp}/financialPlan.do
+/annualReport/{crp}/melia.do
+/admin/{crp}/usersManagement.do
+/bi/{crp}/bi.do
+```
+
+If a user attempts to access a URL for a Global Unit they are not assigned to, the `validCrp` and `validSessionCrp` interceptors reject the request. This means a user's session is always anchored to one Global Unit at a time, even if they hold roles in multiple programs.
+
+## How users can belong to multiple programs
+
+A single MARLO user account can hold roles in more than one Global Unit. After logging in, the user sees a program selector in the top navigation that lets them switch between the Global Units they are assigned to.
+
+When a user switches programs, their session context updates and all subsequent requests are scoped to the newly selected Global Unit. Any unsaved changes in the previous program are not preserved — MARLO will prompt the user before navigating away from an unsaved form.
+
+<Note>
+Assigning a user to an additional program requires an Admin (or Super Admin) for that program. A user cannot self-enroll in a Global Unit.
+</Note>
+
+## Onboarding a new program
+
+Onboarding a new Global Unit is a controlled operation that requires **Super Admin** access for the initial setup steps. Once the Global Unit is registered, day-to-day configuration can be delegated to a program-level Admin.
+
+<Steps>
+  <Step title="Register the Global Unit">
+    A Super Admin navigates to **Super Admin → Global Units** and creates a new entry. Required fields include the program's full name, acronym (used in URLs), and type (CRP, Platform, or Center). The acronym cannot be changed after creation without affecting all existing URLs for that program.
+  </Step>
+  <Step title="Configure phases">
+    A Super Admin sets up the initial phases for the program under **Super Admin → Phases**. Each phase has a name (e.g., POWB 2026), a year, a type (Planning / UpKeep / Reporting), and an open/close window. At least one active phase is required before any cluster data can be entered.
+  </Step>
+  <Step title="Assign a program Admin">
+    A Super Admin grants the Admin role to at least one person who will manage the program. From this point, the program Admin can handle the remaining configuration steps independently.
+  </Step>
+  <Step title="Configure partner institutions">
+    The program Admin navigates to **Admin → Partners Management** and links the partner institutions that are active in the program. These institutions form the basis for cluster scope assignments. Partner institution data is sourced from CLARISA.
+  </Step>
+  <Step title="Configure locations">
+    The program Admin adds the countries and regions the program operates in under **Admin → Locations Management**. Location data is also sourced from CLARISA.
+  </Step>
+  <Step title="Set up portfolios and clusters">
+    The program Admin creates the cluster or project structure under **Admin → Portfolios Management**. Each portfolio entry corresponds to a cluster that will be tracked in the program.
+  </Step>
+  <Step title="Configure program parameters and specificities">
+    The program Admin reviews the available parameters under **Admin → Parameters Management** and enables any specificities that the program requires. See [Per-program feature flags](/admin/specificities) for details on what specificities control.
+  </Step>
+  <Step title="Configure Impact Pathway taxonomies">
+    The program Admin (or PMU) sets up the program's SLOs, IDOs, and cross-cutting issues under the Impact Pathway section. These are the strategic categories that cluster work will map to.
+  </Step>
+  <Step title="Assign cluster roles and invite team members">
+    The program Admin assigns Cluster Leader and Cluster Coordinator roles to the research team members under **Admin → Users Management**. Each cluster-scoped role must be linked to the appropriate partner institution.
+  </Step>
+</Steps>
+
+<Note>
+Steps 1–3 require Super Admin access and must be completed by the IBD platform team. Steps 4–9 can be completed by the program's own Admin once the Global Unit is live. If you are onboarding a new program, contact `Marlosupport@cgiar.org` to initiate steps 1–3.
+</Note>
+
+## Program-level taxonomies
+
+Each Global Unit manages its own set of strategic taxonomies. These taxonomies define the outcome framework that cluster deliverables and OICRs link to.
+
+**SLOs (Strategic Locus Outcomes)** — the top-level strategic goals of the program (e.g., food security, climate adaptation).
+
+**IDOs (Intermediate Development Outcomes)** — the mid-level outcomes that feed into SLOs. Cluster work links to IDOs when reporting results.
+
+**Cross-cutting issues** — thematic dimensions that cut across the outcome hierarchy (e.g., gender, youth, capacity development).
+
+All three are configured per program in the Impact Pathway section. Changing SLO or IDO definitions mid-cycle affects how historical data maps to the current framework, so taxonomy changes should be planned before a phase opens.
+
+## Data isolation
+
+Although multiple programs share the same MARLO database, data isolation is enforced at multiple levels:
+
+- Every phased entity (deliverable, innovation, OICR, partner, etc.) carries a `phase_id` that links to a specific phase within a specific Global Unit.
+- Every query in the data layer is filtered by `global_unit_id` and `phase_id`.
+- URL-level scoping and interceptor validation prevent cross-program data access in the UI.
+- REST API endpoints are authenticated per consumer and return only data for the authorized Global Unit.
+
+There is no built-in data export from one Global Unit into another. If a program needs to migrate or copy data between Global Units, contact the IBD team.

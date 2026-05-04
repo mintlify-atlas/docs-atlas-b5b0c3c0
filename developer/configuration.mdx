@@ -1,0 +1,254 @@
+---
+title: "Configuring MARLO: Spring profiles and properties"
+description: "How MARLO properties files work, what each profile controls, the full list of configurable keys, and why credential files must never be committed."
+---
+
+MARLO loads its runtime configuration from a profile-specific properties file at startup. The active Spring profile determines which file is read, which means you can maintain separate credential sets for development, testing, and production without touching application code. This page covers the file naming convention, every major property category, and the code-style configuration files used by Checkstyle.
+
+## Properties file naming
+
+The application resolves configuration using:
+
+```
+marlo-web/src/main/resources/config/marlo-${spring.profiles.active}.properties
+```
+
+| Profile | File loaded | Typical use |
+|---|---|---|
+| `dev` | `marlo-dev.properties` | Local development |
+| `test` | `marlo-test.properties` | Shared CIAT test environment (FortiClient VPN) |
+| `api` | `marlo-api.properties` | API-only deployments |
+| `pro` | `marlo-pro.properties` | Production (AWS, GlobalProtect VPN) |
+
+<Note>
+`marlo-dev.properties`, `marlo-api.properties`, `marlo-pro.properties`, and `marlo-test.properties` are all listed in `marlo-web/src/main/resources/config/.gitignore`. They are intentionally excluded from version control. You must create `marlo-dev.properties` locally by copying the template.
+</Note>
+
+## Creating your local properties file
+
+```bash
+cp marlo-web/src/main/resources/config/marlo-test.properties \
+   marlo-web/src/main/resources/config/marlo-dev.properties
+```
+
+Edit the copy to point at your local MySQL instance. The template ships with `XXXXXX` placeholders for every sensitive value.
+
+<Warning>
+**Never commit credential files to git.** The `.gitignore` in the config directory already excludes them, but be careful with `git add -f` or IDE tooling that bypasses gitignore rules. Committing credentials is a hard rule violation per the project's constitutional rules.
+</Warning>
+
+## Property categories
+
+### Database
+
+```properties
+# BD test
+
+mysql.host=localhost
+mysql.user=marlo_user
+mysql.password=your_password
+mysql.database=marlodb
+mysql.port=3306
+
+mysql.url=jdbc:mysql://${mysql.host}:${mysql.port}/${mysql.database}
+mysql.show_sql=false
+```
+
+`mysql.url` uses property interpolation — changing `mysql.host`, `mysql.port`, and `mysql.database` is usually enough. Set `mysql.show_sql=true` only when debugging SQL queries; it generates significant log output.
+
+### Application base URL
+
+```properties
+marlo.baseUrl=https://localhost:8443
+```
+
+The run scripts (`scripts/update-marlo-dev-java8.sh` and `scripts/update-marlo-dev-java17.sh`) patch this value automatically each time you start the server, so you rarely need to edit it by hand. Java 8 branches use `https://localhost:8443`; Java 17 branches use `http://localhost:8080`.
+
+### Section flags
+
+```properties
+marlo.admin.active=true
+marlo.impactPathway.active=true
+```
+
+These boolean flags enable or disable top-level application sections at runtime. Leave both `true` for a full local environment.
+
+### Email (SMTP)
+
+```properties
+email.notification=no-reply@yourdomain.org
+email.test=dev-inbox@yourdomain.org
+email.user=smtp_user
+email.password=smtp_password
+email.host=smtp.yourdomain.org
+email.port=25
+email.auth=true
+email.starttls=true
+
+# Backup SMTP (optional)
+email.notificationbackup=backup@yourdomain.org
+email.userbackup=backup_smtp_user
+email.passwordbackup=backup_smtp_password
+email.hostbackup=smtp-backup.yourdomain.org
+email.portbackup=587
+email.authbackup=true
+email.starttlsbackup=true
+```
+
+For local development, set `email.host` to a local SMTP relay or a service like Mailhog. The `email.test` address receives test-mode notifications instead of real recipients when `marlo.production=false`.
+
+### File storage
+
+```properties
+# Public download URL for uploaded files
+file.downloads=https://aiccra.marlo.cgiar.org/data
+
+# Relative sub-folder prefixes
+file.uploads.projectsFolder=projects/
+file.uploads.project.WorkplanFolder=workplan/
+file.uploads.project.bilateralProposalFolder=bilateralProposal/
+file.uploads.project.bilateralPAnualReport=anualReport/
+file.uploads.fundingSourceFolder=fundingSource/
+
+# Maximum upload size in bytes (default: 3 MB)
+file.maxSizeAllowed.bytes=3145728
+
+# Absolute path to local upload root
+file.uploads.baseFolder=/home/youruser/marloFiles/
+
+# CDN base URL (optional; leave blank to serve from baseFolder)
+cdn.url=
+```
+
+Set `file.uploads.baseFolder` to a directory that exists on your machine. MARLO will create sub-folders inside it automatically.
+
+### Environment mode
+
+```properties
+marlo.production=false
+marlo.debug=false
+```
+
+With `marlo.production=false`, emails go to the `email.test` address and some safety checks are relaxed. Never deploy with `marlo.production=false`.
+
+### Logging
+
+```properties
+log.folder=/home/youruser/logs
+log.console=true
+log.file=true
+
+# false = info/warn/error only; true = all levels including trace/debug
+log.production=false
+log.test=true
+
+log.instance=dev-local
+```
+
+`log.instance` appears in structured log output and helps identify entries from a specific environment. Set it to something recognisable (for example `dev-yourname`).
+
+### Auto-save
+
+```properties
+autosave.active=true
+autosave.folder=/home/youruser/marloAutosave/
+```
+
+Auto-save persists form state to disk between HTTP requests. The folder must exist and be writable.
+
+### Real-time notifications (Pusher)
+
+```properties
+pusher.api.key=your_pusher_key
+pusher.api.appid=your_pusher_appid
+pusher.api.privatekey=your_pusher_private_key
+```
+
+Pusher is used for in-browser notifications. For local development without real-time features, you can leave these as placeholders — the application degrades gracefully.
+
+### CLARISA integration
+
+```properties
+clarisa.publicUser=api_user
+clarisa.publicPass=api_password
+clarisa.api.host=https://clarisa.cgiar.org
+clarisa.api.username=api_user
+clarisa.api.password=api_password
+clarisa.mapDatabase.path=/home/youruser/mapsDatabase/
+clarisa.summariesPDF=http://marlodev.ciat.cgiar.org/
+clarisa.wos.link=https://wos.example.org/
+clarisa.wos.user=wos_user
+clarisa.wos.password=wos_password
+```
+
+CLARISA provides partner and institution reference data. The shared test environment pre-configures these; in a fully offline setup, calls to CLARISA will fail but non-CLARISA features remain functional.
+
+### Report microservice and summaries
+
+```properties
+microservice.queueUrl=amqp://...
+microservice.queueName=report-queue
+microservice.userName=mq_user
+microservice.password=mq_password
+microservice.bucketName=marlo-reports
+microservice.reporting.url=https://reports.example.org/
+microservice.s3.url=https://s3.example.org/
+
+summary.microservice.url=https://summaries.example.org/
+```
+
+These properties wire MARLO to the async report generation service. Leave them blank or pointed at mock endpoints for local development unless you are specifically working on reporting features.
+
+### Miscellaneous
+
+```properties
+tawkto.api.key=your_tawkto_key
+ocs.link=https://ocs.example.org/
+ocs.user=ocs_user
+ocs.password=ocs_password
+recaptcha.site.key=your_recaptcha_key
+```
+
+## Code style and Checkstyle configuration
+
+The `configuration/` directory at the repository root contains the formatting and linting rules enforced on all Java and JavaScript code:
+
+| File | Purpose |
+|---|---|
+| `configuration/ccafs-java-style-config.xml` | Eclipse/IntelliJ Java formatter profile |
+| `configuration/ccafs-java-style.importorder` | Import ordering rules for Java formatters |
+| `configuration/ccafs-javascript-style.xml` | JavaScript formatter profile |
+| `configuration/marlo-checkstyle.xml` | Checkstyle rules (line length, naming, padding, file length) |
+
+Checkstyle is wired into the Maven build:
+
+```bash
+# Report only (generates target/checkstyle-result.xml)
+mvn checkstyle:checkstyle
+
+# Fail the build on violations — run this before every commit
+mvn checkstyle:check
+```
+
+Key Checkstyle rules:
+
+- Maximum line length: 120 characters
+- Maximum file length: 3,500 lines
+- Indentation: 2 spaces
+- Braces on the same line as the opening statement
+- Mandatory blocks for `if`, `while`, `for`, and `do`
+- Package names must match `^[a-z]+(\.[a-z][a-z0-9]*)*$`
+
+Import the formatter XML into your IDE to auto-apply these rules on save.
+
+## Pointing at shared CIAT test data
+
+The `marlo-test.properties` template is pre-configured with the CIAT Palmira shared test database. To use it:
+
+1. Connect to **FortiClient VPN** (CIAT Palmira).
+2. Replace the `XXXXXX` placeholders for `mysql.host`, `mysql.user`, and `mysql.password` with the values provided by the IBD team.
+3. Set the active Spring profile to `test` in your run script or IDE run configuration.
+
+<Tip>
+When switching between local MySQL and the shared test database, only `mysql.host`, `mysql.user`, and `mysql.password` normally need to change. Keep both sets in separate properties files (`marlo-dev.properties` for local, let the test environment use `marlo-test.properties`) and switch profiles instead of editing files.
+</Tip>

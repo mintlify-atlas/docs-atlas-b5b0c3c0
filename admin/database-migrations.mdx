@@ -1,0 +1,97 @@
+---
+title: "Schema migrations and database versioning in MARLO"
+description: "How Flyway manages MARLO's schema evolution, the migration naming convention, where migrations live, and what to know before deploying schema changes."
+---
+
+Every change to MARLO's database schema — whether it is a new table, a new column, or a modified constraint — ships as a versioned SQL migration file. MARLO uses [Flyway](https://flywaydb.org/) to manage these migrations. Flyway applies them automatically in version order each time the application starts, ensuring that every environment (development, test, staging, production) goes through the same schema evolution steps. This page covers what Flyway does, how migrations are named and organized, and what administrators need to know when schema changes are deployed.
+
+<Warning>
+Migrations that have already been applied to a database must never be edited. Flyway checksums each migration file after applying it. If a file is modified after the fact, Flyway will refuse to start the application and log a checksum mismatch error. Always create a new migration file to correct or extend an applied change.
+</Warning>
+
+## What Flyway does
+
+Flyway maintains a `flyway_schema_history` table in the MARLO database. Every time the application starts, Flyway:
+
+1. Reads all migration files from the configured migrations directory.
+2. Compares their version numbers against the `flyway_schema_history` table.
+3. Applies any migrations with version numbers higher than the last applied migration, in ascending version order.
+4. Records each applied migration in `flyway_schema_history` with its checksum, execution time, and success status.
+
+If any migration fails, Flyway marks it as failed in `flyway_schema_history` and the application start is aborted. The database is left in the state it was in after the last successful migration.
+
+Because Flyway runs at Tomcat startup, there is no separate step to run migrations in MARLO. Deploying a new version of the application automatically applies any new migrations.
+
+## Migration naming convention
+
+All migration files follow a strict naming format:
+
+```
+V<major>_<minor>_<patch>_<YYYYMMDD>_<HHMM>__<Description>.sql
+```
+
+For example:
+
+```
+V1_0_2_20260402_1430__Add_deliverable_open_access_flag.sql
+V1_0_3_20260415_0900__Add_specificity_tip_module.sql
+```
+
+The version segment (`V<major>_<minor>_<patch>_<YYYYMMDD>_<HHMM>`) determines the order in which Flyway applies migrations. Flyway sorts by this segment lexicographically, so the date and time portion (`YYYYMMDD_HHMM`) ensures correct ordering when multiple migrations share the same major/minor/patch version.
+
+The `<Description>` segment after the double underscore (`__`) is for human readability only. It does not affect execution order or uniqueness.
+
+<Note>
+The naming convention is a constitutional rule in MARLO. All schema changes must follow this format — no exceptions. Migrations that do not follow the pattern will either be ignored by Flyway or cause startup failures.
+</Note>
+
+## Where migrations live
+
+All migration files are stored in:
+
+```
+marlo-web/src/main/resources/database/migrations/
+```
+
+This directory is packaged into the application WAR and is the only location Flyway scans. Do not place migration files anywhere else.
+
+## What administrators need to know
+
+### Migrations apply automatically on startup
+
+You do not need to run migrations manually. When a new version of MARLO is deployed to Tomcat, Flyway applies any pending migrations before the application begins serving requests. If the migrations take a long time (for example, a migration that backfills data into a large table), Tomcat's startup may appear slow — this is expected.
+
+### Check migration status in the database
+
+To see which migrations have been applied and whether any have failed, query the `flyway_schema_history` table:
+
+```sql
+SELECT version, description, installed_on, success
+FROM flyway_schema_history
+ORDER BY installed_rank;
+```
+
+A `success` value of `1` means the migration was applied cleanly. A value of `0` means it failed. A failed migration will prevent the application from starting until it is either repaired or manually resolved.
+
+### Never edit applied migrations
+
+Once a migration has been applied to any environment, treat it as immutable. If a migration contains an error:
+
+- Do not edit the existing file.
+- Create a new migration file with a higher version number that corrects the issue.
+
+If you edit an applied migration file, Flyway will detect the checksum mismatch on the next startup and refuse to run — blocking the application in all environments that have already applied the original migration.
+
+### Coordinate schema changes across environments
+
+MARLO runs on three environments: Test (CIAT Palmira), Staging, and Production (AWS). A migration applied in Test must also be applied in Staging and Production when the containing release is promoted. Because migrations run automatically on startup, this happens as part of the normal deployment pipeline — but it means you should not deploy a new application version to Production until the migration has been validated in Test and Staging.
+
+### Requesting schema changes
+
+If your program needs a schema change — for example, a new specificity, a new configuration parameter, or a new data field — submit a request to `Marlosupport@cgiar.org`. Include:
+
+- A description of what you need and why.
+- Which program(s) are affected.
+- Whether the change needs to be applied before or after a specific phase opens.
+
+The IBD development team will write the migration, test it, and coordinate deployment. **Do not attempt to make schema changes directly on the production database.** All schema changes must go through the migration pipeline.

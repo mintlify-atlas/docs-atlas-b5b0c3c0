@@ -1,0 +1,140 @@
+---
+title: "Quality assurance review workflow in MARLO for clusters"
+description: "How QA reviewers open the queue, add field-scoped feedback, and validate items, and how coordinators respond to feedback to reach the 92% quality target."
+---
+
+Quality assurance in MARLO is a structured, evidence-based review process built directly into the platform rather than managed through separate spreadsheets or email. QA reviewers assess cluster submissions against the program's quality criteria — a 92%+ quality rating and 95%+ open-access compliance rate — and attach field-scoped comments that coordinators resolve in place. The entire cycle — submit, review, revise, re-validate — happens inside MARLO, creating an auditable record of every change.
+
+<Tabs>
+  <Tab title="QA reviewer">
+
+    ## QA reviewer workflow
+
+    <Steps>
+      <Step title="Open the QA queue">
+        Navigate to **Quality Assurance** in the main menu. The QA queue lists all items pending review for the active phase. Each row shows the cluster name, section (Deliverable, OICR, Innovation, Description, etc.), current status, and when the item was last updated.
+      </Step>
+
+      <Step title="Filter the queue">
+        Use the filter controls to narrow the queue by:
+
+        - **Cluster** — review one cluster at a time to maintain focus.
+        - **Section** — filter to a specific content type (e.g., all Deliverables).
+        - **Status** — show only items that are `Pending`, `Needs Revision`, or `Validated`.
+
+        During high-volume periods (end-of-cycle AR), filtering by section and then working systematically through clusters is more efficient than tackling the queue in submission order.
+      </Step>
+
+      <Step title="Open an item for review">
+        Click an item to open the review detail page. You will see:
+
+        - The **current phase values** submitted by the coordinator.
+        - Where available, a **side-by-side comparison** with the previous phase's values (for example, POWB planned values alongside AR reported values).
+        - Any feedback comments that have already been added by other reviewers.
+      </Step>
+
+      <Step title="Review fields and add feedback">
+        Work through each field in the item. If a field requires improvement:
+
+        1. Click the **Add comment** button next to the relevant field.
+        2. Write a specific, actionable comment explaining what needs to change and why.
+        3. Comments are field-scoped — each comment is attached to the specific field it addresses, making it unambiguous for the coordinator.
+
+        Good QA feedback is concrete:
+        - "The DOI link is broken — please verify the URL and re-enter."
+        - "Open Access intent is marked 'Restricted' but the program target requires open deposit. Please confirm or update."
+        - "OICR maturity is listed as Level 4, but no supporting evidence is attached. Please upload the policy document referenced in the narrative."
+      </Step>
+
+      <Step title="Mark the item Validated or Needs Revision">
+        After reviewing all fields:
+
+        - **Validated** — the item meets quality criteria. No further action is required from the coordinator for this item.
+        - **Needs Revision** — one or more fields require coordinator action. The coordinator will be notified and the item reappears in their editing view with your comments visible.
+
+        <Note>
+          An item marked **Needs Revision** does not block coordinators from editing other sections. The coordinator can address your comments on their own schedule within the review window.
+        </Note>
+      </Step>
+
+      <Step title="Monitor the dashboard">
+        The QA dashboard (embedded in the **Quality Assurance** section) shows aggregate validation progress across clusters and sections. During active review periods, this dashboard refreshes every 30 minutes or less.
+
+        Track:
+        - Percentage of items validated versus pending versus needing revision.
+        - Per-cluster completeness of QA coverage.
+        - Response rate — how quickly coordinators are addressing `Needs Revision` items.
+      </Step>
+    </Steps>
+
+    ## Common QA review questions
+
+    <Accordion title="What counts as sufficient Open Access evidence?">
+      A deliverable meets the open-access criterion when it has one of the following:
+      - A DOI pointing to a publication under an open licence (CC BY or equivalent).
+      - A CGSpace handle confirming the document has been deposited in the CGIAR open-access repository.
+      - A confirmed deposit in another approved institutional or subject repository.
+
+      A statement of intent without an actual link or DOI is not sufficient for a completed deliverable. For planned deliverables still in progress, intent is acceptable.
+    </Accordion>
+
+    <Accordion title="How should I handle a deliverable with a broken DOI?">
+      Mark the item **Needs Revision** and add a comment scoped to the DOI field explaining that the link is not resolving. Do not attempt to look up or substitute the correct DOI yourself — the coordinator is responsible for verifying and re-entering the link. Once corrected, the item returns to your queue for re-review.
+    </Accordion>
+
+    <Accordion title="Can I validate an item even if minor fields are incomplete?">
+      Use your judgment based on the program's quality rubric. Required fields (as defined by the validator in MARLO) will prevent submission if empty, so any item that reaches the QA queue has passed basic completeness checks. Optional fields that are empty but not materially affecting quality are generally acceptable to mark as Validated with an informational comment suggesting improvement.
+    </Accordion>
+
+    <Accordion title="What do I do if a coordinator has submitted incorrect data and needs to re-enter it completely?">
+      Mark the item **Needs Revision** and clearly explain what is incorrect and what correct data should look like. If the issue is systemic across a cluster (for example, a misunderstanding of a field definition), contact the PMU lead to coordinate a briefing for the coordinator rather than leaving individual comments on every item.
+    </Accordion>
+
+    <Accordion title="How do I track whether a coordinator has responded to my feedback?">
+      The QA queue status updates automatically when a coordinator saves changes to a `Needs Revision` item. The item status changes to reflect the update, and the dashboard reflects the change within the 30-minute refresh window. You do not need to contact coordinators directly — the queue is the communication channel.
+    </Accordion>
+
+  </Tab>
+  <Tab title="Coordinator responding to feedback">
+
+    ## Coordinator: responding to QA feedback
+
+    When a QA reviewer marks one of your items as **Needs Revision**, you receive a notification. Here is how to address the feedback efficiently.
+
+    <Steps>
+      <Step title="Find items awaiting your attention">
+        Open the relevant section (Deliverables, OICRs, etc.) for your cluster. Items with unresolved QA feedback are highlighted. You can also navigate to the **Quality Assurance** menu to see a list of all your cluster's `Needs Revision` items in one place.
+      </Step>
+
+      <Step title="Read the reviewer's comments">
+        Each comment is displayed next to the specific field it addresses. Read the comment carefully before making changes — reviewers typically explain both what is wrong and what the expected correction is.
+      </Step>
+
+      <Step title="Make the requested change">
+        Edit the field indicated. Common corrections include:
+        - Updating or correcting a DOI or repository link.
+        - Uploading a missing artefact or evidence document.
+        - Revising a narrative field to include required information.
+        - Correcting an Open Access classification.
+        - Attaching evidence to an OICR maturity claim.
+      </Step>
+
+      <Step title="Save and notify the reviewer">
+        Save the section. MARLO automatically updates the item status, and the QA reviewer's queue reflects the change within the dashboard's next refresh cycle (within 30 minutes during active periods). You do not need to separately notify the reviewer.
+      </Step>
+
+      <Step title="Escalate if you disagree or need clarification">
+        If a QA comment requests a change you believe is incorrect or that you cannot make without additional information, contact your PMU lead rather than leaving the item unresolved. The PMU can mediate between coordinators and reviewers when there is a factual or interpretive dispute.
+      </Step>
+    </Steps>
+
+    <Info>
+      QA feedback does not overwrite your data — reviewers can only read and comment, not edit. You remain in control of what is saved to your cluster's record. The reviewer re-evaluates after you save your changes.
+    </Info>
+
+    <Warning>
+      Unresolved `Needs Revision` items count against your cluster's quality score. The program's 92%+ quality target is calculated over validated items. If items remain unresolved when the QA window closes, they may be counted as non-validated, which lowers your cluster's quality rating for the reporting cycle.
+    </Warning>
+
+  </Tab>
+</Tabs>

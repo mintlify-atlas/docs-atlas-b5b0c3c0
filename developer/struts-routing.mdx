@@ -1,0 +1,222 @@
+---
+title: "MARLO Struts 2 routing: actions, stacks, and config"
+description: "MARLO routes forms through Struts 2 (.do) and REST through Spring MVC (/api/*). Every .do action must declare an interceptor stack and a FreeMarker result."
+---
+
+MARLO's web tier is split between two independent routing layers that never overlap. Struts 2 owns all form-driven user interactions — the screens where researchers enter data, upload files, and submit section saves. Spring MVC owns the REST API consumed by external systems such as CLARISA, Power BI ingestion pipelines, and the CGIAR AI services. This page covers the Struts 2 side in full and explains where the boundary between the two layers is enforced.
+
+## Two routing layers
+
+| Layer | URL pattern | Declared in | Purpose |
+|---|---|---|---|
+| Struts 2 | `*.do`, `*.json` (legacy) | `struts.xml` + `struts-*.xml` files | Form submissions, page renders, file downloads |
+| Spring MVC | `/api/*` | `MarloRestApiConfig.java` | REST API for external integrations |
+
+The boundary is enforced by a single constant in `marlo-web/src/main/resources/struts.xml`:
+
+```xml
+<constant name="struts.action.excludePattern" value="/api/*" />
+```
+
+Any path under `/api/` is invisible to the Struts dispatcher. Spring MVC handles it exclusively.
+
+The two other routing constants that define what Struts accepts:
+
+```xml
+<constant name="struts.action.extension" value="do,,json" />
+<constant name="struts.patternMatcher" value="regex" />
+```
+
+`struts.patternMatcher = regex` enables the `{crp}` wildcard segments in action names. `struts.action.extension` allows both `.do` (primary) and `.json` (legacy, restricted) extensions.
+
+## URL structure
+
+The URL pattern for almost every MARLO action is:
+
+```
+/{namespace}/{crp}/{action}.do
+```
+
+For example:
+- `/projects/ccafs/description.do` — project description form for the CCAFS CRP.
+- `/impactPathway/wheat/outcomes.do` — impact pathway outcomes for the WHEAT CRP.
+- `/admin/biodiv/portfolioManagement.do` — portfolio management in the Bioversity admin area.
+
+The `{crp}` segment is matched by the `{crp}` regex wildcard in the action name and is passed to the `validCrp` interceptor, which verifies the slug identifies a real global unit and loads the corresponding `GlobalUnit` into the session.
+
+## Configuration files
+
+The main `struts.xml` defines global constants, all interceptors by name, and all interceptor stacks. Individual domain packages with their action mappings live in per-domain files that `struts.xml` includes:
+
+| File | Domain package / namespace |
+|---|---|
+| `struts.xml` | Global constants, interceptor definitions, interceptor stacks, `marlo-default` package |
+| `struts-projects.xml` | `projects` / `/projects` |
+| `struts-fundingSources.xml` | `fundingSources` / `/fundingSources` |
+| `struts-impactPathway.xml` | `impactPathway` / `/impactPathway` |
+| `struts-powb.xml` | `powb` / `/powb` |
+| `struts-annualReport.xml` | `annualReport` / `/annualReport` |
+| `struts-admin.xml` | `admin` / `/admin` |
+| `struts-publications.xml` | `publications` / `/publications` |
+| `struts-studies.xml` | `studies` / `/studies` |
+| `struts-synthesis.xml` | `synthesis` / `/synthesis` |
+| `struts-summaries.xml` | `summaries` / `/summaries` |
+| `struts-json.xml` | JSON endpoints (existing only) |
+| `struts-superadmin.xml` | `superadmin` / `/superadmin` |
+| `struts-home.xml` | `home` / `/home` |
+| `struts-bi.xml` | BI dashboard actions |
+| `struts-ai.xml` | AI screen actions |
+| `struts-qa.xml` | Quality assurance actions |
+| `struts-tip.xml` | Technology Innovation Profile actions |
+| `struts-center-*.xml` | CGIAR Center-specific modules |
+
+All packages extend `marlo-default`, which inherits from Struts `struts-default` and provides the FreeMarker result type as the default.
+
+## Interceptor stacks
+
+Every action mapping must declare one interceptor stack. The stacks are defined in `struts.xml` under the `marlo-default` package. They share a common structure: i18n loading → CRP validation → authentication → session validation → domain-specific edit gate → redirect-message preservation → stage access → input trimming → Struts default stack.
+
+The domain-specific edit gate is the key differentiator between stacks. It enforces section-level write permissions before any action code runs.
+
+### Available stacks
+
+| Stack name | Edit gate interceptor | Typical use |
+|---|---|---|
+| `editProjectsStack` | `canEditProject` | Project sections (description, partners, deliverables, outcomes, budgets, etc.) |
+| `editFSStack` | `editFunding` | Funding source form |
+| `editPowbStack` | `canEditPowbSynthesis` | POWB synthesis sections |
+| `editReportSynthesisStack` | `canEditReportSynthesis` | Annual report synthesis sections |
+| `impactPathwayStack` | `canEditImpactPathway` | Impact pathway outcomes and milestones |
+| `crpAdminStack` | `accessibleAdmin` + `canEditCrpAdmin` | CRP admin pages (portfolios, parameters, users) |
+| `editProjectListStack` | _(none — lightweight)_ | Used before per-action interceptors like `editDeliverable` |
+| `editPublicationStack` | `canEditPublication` | Publication forms |
+| `editStudyStack` | `editExpectedStudy` | Expected study forms |
+| `projectListStack` | `SecurityControl` | Existing JSON endpoints only |
+| `homeStack` | `requireUser` | Home dashboard and authenticated read-only pages |
+| `superAdminStack` | `superAdminValidation` | System-level administration pages |
+
+### Stack definition example
+
+`editProjectsStack` as declared in `struts.xml`:
+
+```xml
+<interceptor-stack name="editProjectsStack">
+  <interceptor-ref name="i18nFile" />
+  <interceptor-ref name="validCrp" />
+  <interceptor-ref name="requireUser" />
+  <interceptor-ref name="validSessionCrp" />
+  <interceptor-ref name="canEditProject" />
+  <interceptor-ref name="keepRedirectMessages" />
+  <interceptor-ref name="accessibleStage" />
+  <interceptor-ref name="trimInputs" />
+  <interceptor-ref name="defaultStack" />
+</interceptor-stack>
+```
+
+`crpAdminStack` adds two edit-gate interceptors instead of one:
+
+```xml
+<interceptor-stack name="crpAdminStack">
+  <interceptor-ref name="i18nFile" />
+  <interceptor-ref name="validCrp" />
+  <interceptor-ref name="requireUser" />
+  <interceptor-ref name="validSessionCrp" />
+  <interceptor-ref name="accessibleAdmin" />
+  <interceptor-ref name="canEditCrpAdmin" />
+  <interceptor-ref name="keepRedirectMessages" />
+  <interceptor-ref name="accessibleStage" />
+  <interceptor-ref name="trimInputs" />
+  <interceptor-ref name="defaultStack" />
+</interceptor-stack>
+```
+
+## Action mapping anatomy
+
+A minimal action mapping in a `struts-<area>.xml` file:
+
+```xml
+<package name="projects" namespace="/projects" extends="marlo-default">
+
+  <action name="{crp}/description"
+      class="org.cgiar.ccafs.marlo.action.projects.ProjectDescriptionAction">
+    <interceptor-ref name="editProjectsStack" />
+    <result name="input">
+      /WEB-INF/crp/views/projects/projectDescription.ftl
+    </result>
+    <result name="success" type="redirectAction">
+      <param name="actionName">${crpSession}/description</param>
+      <param name="edit">true</param>
+      <param name="phaseID">${phaseID}</param>
+      <param name="projectID">${projectID}</param>
+    </result>
+    <result name="cancel" type="redirectAction">
+      <param name="actionName">${crpSession}/description</param>
+      <param name="edit">true</param>
+      <param name="phaseID">${phaseID}</param>
+      <param name="cancel">true</param>
+      <param name="projectID">${projectID}</param>
+    </result>
+  </action>
+
+</package>
+```
+
+Key points:
+- `name="input"` maps to the FreeMarker template rendered when validation fails (the Struts `INPUT` result string).
+- `name="success"` redirects back to the same form after a successful save (Post-Redirect-Get pattern).
+- `name="cancel"` redirects back with `cancel=true` so the template can show the discard-changes state.
+- The `${phaseID}` and `${projectID}` OGNL expressions are populated from properties on the action class.
+
+## Critical action routing catalog
+
+The table below maps representative routes to their classes, stacks, and view templates:
+
+| Module | Route | Action class | Stack | Template |
+|---|---|---|---|---|
+| Projects | `{crp}/description` | `ProjectDescriptionAction` | `editProjectsStack` | `projects/projectDescription.ftl` |
+| Projects | `{crp}/partners` | `ProjectPartnerAction` | `editProjectsStack` | `projects/projectPartners.ftl` |
+| Projects | `{crp}/deliverable` | `DeliverableAction` | `editProjectListStack` + `editDeliverable` + `defaultStack` | `projects/projectDeliverable.ftl` |
+| Funding Sources | `{crp}/fundingSource` | `FundingSourceAction` | `editFSStack` | `fundingSources/fundingSource.ftl` |
+| POWB | `{crp}/financialPlan` | `FinancialPlanAction` | `editPowbStack` | `powb/powb_financialPlan.ftl` |
+| POWB | `{crp}/managementGovernance` | `ManagementGovernanceAction` | `editPowbStack` | `powb/powb_managementGovernance.ftl` |
+| Impact Pathway | `{crp}/outcomes` | `OutcomesAction` | `impactPathwayStack` | `impactPathway/outcomes.ftl` |
+| Annual Report | `{crp}/melia` | `MeliaAction` | `editReportSynthesisStack` | `annualReport/annualReport_melia.ftl` |
+| Annual Report | `{crp}/governance` | `ManagementGovernanceAction` | `editReportSynthesisStack` | `annualReport/annualReport_governance.ftl` |
+| Admin | `{crp}/portfolioManagement` | `PortfolioManagementAction` | `crpAdminStack` | `admin/portfoliosManagement.ftl` |
+
+## Adding a new Struts action
+
+<Steps>
+
+<Step title="Choose the right domain package">
+Determine which `struts-<area>.xml` file owns the domain your new action belongs to. If the area is Projects, use `struts-projects.xml`. If no existing domain fits, create a new `struts-<area>.xml` file and include it from `struts.xml`.
+</Step>
+
+<Step title="Add the action mapping">
+Inside the package declaration, add an `<action>` element with:
+
+- A name following the `{crp}/<actionName>` convention.
+- The fully-qualified action class.
+- An `<interceptor-ref>` pointing to a stack from the table above.
+- An `input` result pointing to the FreeMarker template.
+- A `success` result with the Post-Redirect-Get redirect.
+- A `cancel` result for discard-changes flows.
+</Step>
+
+<Step title="Create the action class">
+Extend `BaseAction`, implement `Preparable`, and follow the save pipeline described in [The MARLO save pipeline](/developer/save-pipeline). Annotate with `@Inject` on the constructor and inject only the managers the action needs.
+</Step>
+
+<Step title="Create the FreeMarker template">
+Place the `.ftl` file under `marlo-web/src/main/webapp/WEB-INF/crp/views/<area>/`. Include the standard layout fragments and import the `customForm` macro library from `header.ftl`. See [MARLO FreeMarker templates: layout and composition](/developer/frontend-composition) for the composition model.
+</Step>
+
+</Steps>
+
+## Struts JSON endpoints
+
+`*.json` extension is configured (`struts.action.extension = do,,json`) and a small number of existing endpoints use it for partial-page data fetching (for example, partner search during project setup). The `projectListStack` stack, which includes the `SecurityControl` interceptor, guards these endpoints.
+
+<Warning>
+Do not introduce new `*.json` action mappings for new features. Existing JSON endpoints were built under an older pattern and exist for backward compatibility. New data-fetching needs for UI interactions should be assessed against the existing JSON patterns in the same module before a new path is considered. The Struts JSON surface is not intended to grow.
+</Warning>

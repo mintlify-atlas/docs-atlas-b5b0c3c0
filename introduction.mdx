@@ -1,0 +1,81 @@
+---
+title: "MARLO: Agricultural Research Management Platform"
+description: "MARLO is an open-source web platform supporting the full Planning, Monitoring, Reporting, and Learning cycle for complex multi-country research programs."
+---
+
+MARLO (Managing Agricultural Research for Learning and Outcomes) is a web-based research management platform built for CGIAR research programs. It replaces fragmented spreadsheets and email chains with a single, phase-aware system of record covering annual planning, progress monitoring, deliverables, innovations, outcome impact case reports, and quality assurance — all in one place.
+
+Originally deployed for CCAFS (2017+) and now actively powering AICCRA across multiple African countries, MARLO has supported 11 clusters, 1,440+ knowledge products, 95%+ open-access compliance, and 92%+ quality ratings.
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get oriented with MARLO and complete your first planning cycle
+  </Card>
+  <Card title="Platform Architecture" icon="diagram-project" href="/architecture">
+    Understand how MARLO is structured and how data flows through phases
+  </Card>
+  <Card title="Core Workflows" icon="arrows-spin" href="/workflows/annual-planning">
+    Walk through annual planning, monitoring, reporting, and QA
+  </Card>
+  <Card title="Research Outputs" icon="flask" href="/outputs/deliverables">
+    Manage deliverables, innovations, OICRs, and impact pathways
+  </Card>
+  <Card title="Analytics & AI" icon="chart-line" href="/analytics/power-bi">
+    Explore Power BI dashboards and AI-powered reporting tools
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/overview">
+    Integrate with MARLO's REST API for external tools and BI pipelines
+  </Card>
+</CardGroup>
+
+## Why MARLO
+
+Large research programs like AICCRA and CCAFS span many countries, partner institutions, clusters, and donors. Without a shared platform, teams default to siloed spreadsheets and inconsistent reporting. MARLO solves this by providing:
+
+- **A single system of record** — all planning, progress, and reporting data lives in one phase-aware database
+- **Embedded quality assurance** — reviewers provide structured feedback inline, not in separate tools
+- **Audit-safe history** — past phases are immutable; data only replicates forward
+- **Multi-program flexibility** — run multiple CRPs, Platforms, or Centers on one instance with separate roles and configurations
+- **Analytics-ready exports** — operational data flows automatically into Power BI via Microsoft Fabric
+
+## Platform lifecycle
+
+MARLO organizes work around annual **phases**. Each phase represents a distinct moment in the research cycle:
+
+| Phase | Purpose |
+|---|---|
+| **POWB** (Plan of Work and Budget) | Annual planning per cluster |
+| **UpKeep** | Mid-year progress tracking |
+| **Annual Report (AR)** | End-of-year narrative + indicator reporting |
+
+All data entered in one phase automatically replicates forward to future phases — you never start from a blank slate.
+
+## Key capabilities
+
+<CardGroup cols={2}>
+  <Card title="Annual Work Plan & Budget" icon="calendar-check" href="/workflows/annual-planning">
+    Plan cluster activities, budgets, and expected deliverables for the year
+  </Card>
+  <Card title="Deliverables Management" icon="file-circle-check" href="/outputs/deliverables">
+    Track full lifecycle with Open Access and FAIR compliance enforcement
+  </Card>
+  <Card title="Innovation Tracking" icon="lightbulb" href="/outputs/innovations">
+    Register innovations with Scaling Readiness scores (0–9) and typology
+  </Card>
+  <Card title="OICR Documentation" icon="bullseye" href="/outputs/oicrs">
+    Structured outcome impact case reports with maturity classification
+  </Card>
+  <Card title="Quality Assurance" icon="shield-check" href="/workflows/quality-assurance">
+    Structured reviewer feedback with field-level comments and validation states
+  </Card>
+  <Card title="Multi-tenant Admin" icon="building" href="/admin/multi-tenant">
+    Onboard new programs with independent roles, phases, and configurations
+  </Card>
+</CardGroup>
+
+## Support
+
+- **Email:** Marlosupport@cgiar.org
+- **Maintainer:** IBD Team — Alliance of Bioversity International and CIAT
+- **GitHub:** [CCAFS/MARLO](https://github.com/CCAFS/MARLO)
+- **License:** GPL-3.0

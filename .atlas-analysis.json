@@ -1,23 +1,11 @@
 {
-  "$schema": "https://mintlify.com/docs.json",
-  "name": "MARLO",
+  "projectType": "saas",
+  "projectName": "MARLO",
+  "projectDescription": "An open-source web platform for managing the full Planning, Monitoring, Reporting, and Learning (PMRL) cycle of complex multi-country agricultural research programs.",
   "theme": "maple",
-  "colors": {
-    "primary": "#94cb04",
-    "light": "#545454"
-  },
-  "favicon": "https://media.brand.dev/288cc7c4-5cef-4376-950b-bdf0083eedae.png",
-  "navbar": {
-    "primary": {
-      "type": "github",
-      "href": "https://github.com/CCAFS/MARLO"
-    }
-  },
-  "footer": {
-    "socials": {
-      "github": "https://github.com/CCAFS/MARLO"
-    }
-  },
+  "primaryColor": "#94cb04",
+  "lightColor": "#545454",
+  "darkColor": null,
   "navigation": {
     "tabs": [
       {
@@ -102,5 +90,33 @@
         ]
       }
     ]
-  }
+  },
+  "keyFeatures": [
+    "Phase-aware planning and reporting (POWB, UpKeep, Annual Report) with forward-only data replication",
+    "Deliverables management with Open Access and FAIR compliance tracking",
+    "Innovation tracking with Scaling Readiness (0–9) scoring",
+    "Outcome Impact Case Reports (OICRs) with maturity classification",
+    "Structured Quality Assurance workflows with reviewer feedback",
+    "Multi-tenant model supporting multiple CRPs, Platforms, and Centers",
+    "Business Intelligence integration via Microsoft Fabric (Bronze/Silver/Gold) and Power BI",
+    "AI services (Text Mining, Reports Generator, Chatbot) powered by AWS Bedrock",
+    "CLARISA integration for reference data (institutions, geography, taxonomy)",
+    "Per-program feature flags (specificities) for configurable behavior"
+  ],
+  "publicApiSurface": [
+    "GET/POST /api/v2/controllist/deliverables",
+    "GET/POST /api/v2/controllist/innovations",
+    "GET/POST /api/v2/controllist/projects",
+    "GET/POST /api/v2/controllist/institutions",
+    "GET/POST /api/v2/controllist/expectedStudies",
+    "GET/POST /api/v2/controllist/expenditures",
+    "GET/POST /api/v2/controllist/progressTowards",
+    "GET/POST /api/v2/controllist/policies",
+    "GET/POST /api/v2/controllist/impactPathway",
+    "GET/POST /api/v2/controllist/generalLists",
+    "GET /api/v2/controllist/qaToken",
+    "GET /api/v2/controllist/srfLists",
+    "GET /api/v2/controllist/arControlLists",
+    "GET /api/v2/controllist/statusPlannedOutcomes"
+  ]
 }

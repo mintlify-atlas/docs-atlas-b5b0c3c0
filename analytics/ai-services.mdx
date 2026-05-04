@@ -1,0 +1,68 @@
+---
+title: "AI-powered services in MARLO: Text Mining and Chat"
+description: "MARLO's AI services — Text Mining, Reports Generator, and Chatbot — use AWS Bedrock and OpenSearch to surface program data while preserving data governance."
+---
+
+MARLO extends its research-management capabilities with three AI-powered services: Text Mining, Reports Generator, and a conversational Chatbot. Each service reads structured MARLO data through the platform's REST API and AWS infrastructure, then returns enriched content or draft narratives to authenticated users. Critically, none of these services write back to MARLO automatically — every AI output requires a human review step before it becomes part of the official record.
+
+## AI service overview
+
+<CardGroup cols={3}>
+  <Card title="Text Mining" icon="magnifying-glass-chart">
+    Automatically analyzes deliverable content and associated metadata — titles, abstracts, DOIs, FAIR tags — to propose structured candidates such as innovation records or thematic classifications. PMU leads validate proposals before they are saved.
+  </Card>
+  <Card title="Reports Generator" icon="file-lines">
+    Generates draft narrative sections for donor reports by reading deliverables, innovations, OICRs, and QA results from the current phase, then synthesizing them through AWS Bedrock. PMU reviews and edits the draft before submission.
+  </Card>
+  <Card title="Chatbot" icon="message-bot">
+    Provides a conversational interface for querying program data. Authenticated users ask questions in natural language and receive cited, hyperlinked answers grounded in MARLO records. Every response includes source citations so you can verify the answer against the original entry.
+  </Card>
+</CardGroup>
+
+## Accessing AI features in MARLO
+
+AI services are available through the **AI** section of the main navigation menu. The entry point resolves to `/ai/{crp}/` for your current Global Unit and renders `ai/aiUserIdeas.ftl`, which surfaces the available AI tools for your role.
+
+The `AiAction` class loads `AiReportConfiguration` records to determine which AI capabilities are enabled for your program. Not all features may be active for every Global Unit — availability depends on program-level configuration.
+
+<Info>
+MARLO's AI services are built on **AWS Bedrock** using Anthropic's Claude models for text generation and Amazon Titan for embeddings. Amazon OpenSearch provides the vector index layer that enables retrieval-augmented generation (RAG) — meaning AI responses are grounded in actual MARLO records, not generic training data.
+</Info>
+
+## How AI services consume MARLO data
+
+AI services interact with MARLO exclusively through the documented REST API (`/api/v2/*`) and through AWS infrastructure that reads from the same MySQL database used by the BI pipeline. They do not connect directly to the live transactional database with write permissions.
+
+The flow for a typical AI request looks like this:
+
+1. The user triggers an action in the MARLO AI section.
+2. MARLO's backend calls an AWS Lambda function, passing the relevant phase, cluster scope, and data references.
+3. The Lambda function queries MARLO's REST API or OpenSearch vector index to retrieve structured records.
+4. AWS Bedrock (Claude) generates a response using the retrieved context as grounding material.
+5. The response is returned to the MARLO UI for human review.
+
+This architecture means AI services benefit from MARLO's governance — data they read has already passed through QA, phase validation, and role-based access controls.
+
+## Infrastructure
+
+| Component | Role |
+|---|---|
+| **AWS Bedrock (Claude)** | Text generation: report narratives, chat responses |
+| **AWS Bedrock (Titan)** | Embedding generation for semantic search |
+| **Amazon OpenSearch** | Vector index for retrieval-augmented generation |
+| **AWS Lambda** | Orchestration: triggers AI pipelines, calls REST API, manages async jobs |
+| **MARLO REST API** | Data access layer; AI services consume structured records through it |
+
+<Note>
+AI services sit **on top of** MARLO's governance, not instead of it. Data that AI reads has already been entered, validated, and QA-reviewed through the standard MARLO workflow. AI accelerates synthesis and exploration — it does not substitute for the structured data entry and review process that makes MARLO's outputs trustworthy.
+</Note>
+
+## Data governance and write-back rules
+
+AI-generated content — whether a narrative draft, a proposed innovation record, or a chatbot response — never writes directly to MARLO. The platform enforces a human-in-the-loop model:
+
+- **Reports Generator** outputs are drafts that PMU leads review and edit before the content is incorporated into any official submission.
+- **Text Mining** proposals appear as candidates for PMU validation; they do not auto-create records.
+- **Chatbot** responses are read-only summaries with citations; they do not modify any MARLO entity.
+
+This design preserves the audit trail and phase-safe data model that makes MARLO suitable as a system of record for donor reporting.

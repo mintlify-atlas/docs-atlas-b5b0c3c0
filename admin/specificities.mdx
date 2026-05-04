@@ -1,0 +1,80 @@
+---
+title: "Per-program feature flags with MARLO specificities"
+description: "What specificities are, how program admins view and enable them, and when to contact the platform team to register a new specificity for your program."
+---
+
+MARLO supports multiple research programs on a single deployment, but not every program needs every feature. Specificities are the mechanism MARLO uses to enable or disable optional platform behavior per Global Unit — without forking the codebase or maintaining separate deployments. This page explains what specificities are, what they control, and how to manage them for your program.
+
+## What specificities are
+
+A **specificity** is a boolean feature flag scoped to a Global Unit (CRP, Platform, or Center). When a specificity is enabled for your program, the corresponding behavior activates — a section becomes visible, a workflow step is required, or a compliance check is enforced. When it is disabled, the platform falls back to its default behavior.
+
+Specificities live in two database tables:
+
+- **`parameters`** — defines the flag (its key, description, and default value) once per Global Unit type (CRP, Platform, or Center).
+- **`custom_parameters`** — holds the per-program override value (`true` or `false`) for each Global Unit that deviates from the default.
+
+From a program admin's perspective, you do not interact with these tables directly. Instead, you manage specificities through the **Admin → Parameters Management** screen.
+
+<Note>
+Adding a brand-new specificity (one that does not yet exist in the platform) requires a schema migration and code changes. This work must be done by the IBD development team. If your program needs behavior that no existing specificity covers, contact `Marlosupport@cgiar.org` to request a new specificity.
+</Note>
+
+## What specificities control
+
+Specificities govern a wide range of optional behaviors across the platform. Common categories include:
+
+<AccordionGroup>
+  <Accordion title="Section visibility">
+    Some platform sections are hidden by default and only shown when a specificity is enabled. For example, a specificity might control whether the Technology Innovation Profile (TIP) section appears in your program's navigation, or whether a particular synthesis block is shown in the Annual Report.
+  </Accordion>
+  <Accordion title="Workflow requirements">
+    Specificities can make optional workflow steps mandatory for a program. For example, a specificity might require that all deliverables include an Open Access link before they can be submitted, or that OICRs go through an additional internal sign-off step before entering the QA queue.
+  </Accordion>
+  <Accordion title="Compliance and quality checks">
+    Some programs operate under stricter compliance requirements than the platform defaults. A specificity can activate additional validation rules — for example, enforcing that a minimum number of evidence links are attached to an OICR, or requiring a specific field to be filled in before a cluster plan can be submitted.
+  </Accordion>
+  <Accordion title="Reporting fields and templates">
+    Annual Report and POWB synthesis sections sometimes include optional fields or narrative blocks that are only relevant to certain program types. Specificities control whether these fields appear, keeping the form focused for programs that do not need them.
+  </Accordion>
+  <Accordion title="Integration behaviors">
+    Specificities can activate or deactivate integration behaviors — for example, whether submissions trigger a CGSpace open-access check, or whether the AI Reports Generator is available as an option in the AR synthesis screens.
+  </Accordion>
+</AccordionGroup>
+
+## How to view and enable specificities for your program
+
+<Steps>
+  <Step title="Open Parameters Management">
+    Navigate to **Admin** in the top menu and select **Parameters Management**. The URL follows the pattern `/admin/{crp}/parametersManagement.do`.
+  </Step>
+  <Step title="Locate the specificity">
+    The parameters screen lists all available parameters for your program type. Specificities are distinguished by their category. Each entry shows a key name, a description of what the flag controls, and its current value for your program.
+  </Step>
+  <Step title="Set the value">
+    Toggle the value between `true` (enabled) and `false` (disabled) for the specificities you want to change. The screen saves the value as a `custom_parameters` override for your Global Unit.
+  </Step>
+  <Step title="Verify the change">
+    After saving, navigate to the area of the platform affected by the specificity to confirm the behavior has changed as expected. Some changes (such as showing or hiding a navigation section) take effect immediately. Others may require a page refresh or a new user session.
+  </Step>
+</Steps>
+
+<Warning>
+Changes to specificities take effect across the entire program immediately for all users. Before enabling a specificity that adds required fields or tightens validation, coordinate with your cluster coordinators so they are not blocked during an active reporting cycle.
+</Warning>
+
+## The boolean nature of specificities
+
+Every specificity is strictly `true` or `false`. There are no graduated settings, no per-cluster overrides, and no time-based activation. If you enable a specificity for your program, it applies to every cluster and every user in that program.
+
+This simplicity is intentional — specificities are feature flags, not fine-grained permission controls. For behavior that needs to vary by cluster or user, the appropriate mechanism is the role system (see [User roles and access control](/admin/roles-permissions)).
+
+## When to contact the platform team
+
+You should contact `Marlosupport@cgiar.org` in the following situations:
+
+**You need a behavior that no existing specificity covers.** The IBD team must add a new specificity to the codebase, write the migration, and deploy it before you can enable it from the Admin screen. Provide a clear description of the behavior you need, which section it affects, and whether it should default to `true` or `false` for new programs.
+
+**A specificity is behaving unexpectedly.** If enabling a specificity causes a section to break or validation errors that should not be appearing, report the issue with the specificity key name and a description of what you observed.
+
+**You need a specificity enabled on a program you do not have Admin access to.** Super Admin access is required to configure specificities on programs for which you are not the Admin.

@@ -1,0 +1,408 @@
+---
+title: "Partner institution endpoints in the MARLO REST API"
+description: "Reference for MARLO's institutions REST endpoints — list, look up, and request partner institutions and country offices backed by CLARISA reference data."
+---
+
+MARLO's institution data is sourced from **CLARISA** (the CGIAR Reference Platform for Institutional Data), the authoritative registry of research organisations across the CGIAR system. The institutions API lets you browse the full institution catalogue, look up individual records, and submit requests for new institutions or country office additions — all of which flow through CLARISA's approval workflow.
+
+All endpoints require a valid QA token. See [Authentication](/api/authentication) for details.
+
+<Note>
+Institution data reflects the CLARISA registry. New institutions and country office requests submitted via these endpoints enter a review queue. They do not appear as active institutions until a MARLO administrator accepts the request.
+</Note>
+
+---
+
+## List all institutions
+
+Retrieve the complete list of institutions available in MARLO (sourced from CLARISA).
+
+```
+GET /api/v2/controllist/institutions
+```
+
+This endpoint is **not** entity-scoped. Requires `FULL_READ_REST_API_PERMISSION`.
+
+### Response
+
+Returns a JSON array of `InstitutionDTO` objects.
+
+<ResponseField name="code" type="number">
+  CLARISA-assigned institution code (used as the institution identifier across the API).
+</ResponseField>
+<ResponseField name="name" type="string">
+  Full name of the institution.
+</ResponseField>
+<ResponseField name="acronym" type="string">
+  Institution acronym (may be null).
+</ResponseField>
+<ResponseField name="websiteLink" type="string">
+  Institution website URL.
+</ResponseField>
+<ResponseField name="added" type="string">
+  Date the institution was added to the registry.
+</ResponseField>
+<ResponseField name="institutionType" type="object">
+  <Expandable title="InstitutionTypeDTO fields">
+    <ResponseField name="id" type="number">Type identifier.</ResponseField>
+    <ResponseField name="name" type="string">Type name (e.g., "CGIAR Research Center", "University").</ResponseField>
+  </Expandable>
+</ResponseField>
+<ResponseField name="countryOfficeDTO" type="object[]">
+  List of country offices for this institution. Each object contains country information.
+</ResponseField>
+
+**Example:**
+
+```bash
+curl --request GET \
+  --url 'https://your-marlo-host/api/v2/controllist/institutions' \
+  --header 'Authorization: Bearer <your-token>'
+```
+
+---
+
+## Get an institution by ID
+
+Retrieve a single institution by its CLARISA code.
+
+```
+GET /api/v2/controllist/institutions/{code}
+```
+
+This endpoint is **not** entity-scoped. Requires `FULL_READ_REST_API_PERMISSION`.
+
+### Path parameters
+
+<ParamField path="code" type="number" required>
+  CLARISA institution code.
+</ParamField>
+
+**Example:**
+
+```bash
+curl --request GET \
+  --url 'https://your-marlo-host/api/v2/controllist/institutions/122' \
+  --header 'Authorization: Bearer <your-token>'
+```
+
+Returns a single `InstitutionDTO` object. Returns `404` if not found.
+
+---
+
+## List all institution types
+
+Retrieve all institution type categories.
+
+```
+GET /api/v2/controllist/institution-types
+```
+
+This endpoint is **not** entity-scoped. Requires `FULL_READ_REST_API_PERMISSION`.
+
+### Response
+
+Returns a JSON array of `InstitutionTypeDTO` objects.
+
+<ResponseField name="id" type="number">
+  Institution type identifier.
+</ResponseField>
+<ResponseField name="name" type="string">
+  Institution type name (e.g., "University", "Government", "NGO").
+</ResponseField>
+
+**Example:**
+
+```bash
+curl --request GET \
+  --url 'https://your-marlo-host/api/v2/controllist/institution-types' \
+  --header 'Authorization: Bearer <your-token>'
+```
+
+---
+
+## Get an institution type by ID
+
+```
+GET /api/v2/controllist/institution-types/{code}
+```
+
+### Path parameters
+
+<ParamField path="code" type="number" required>
+  Institution type identifier.
+</ParamField>
+
+Returns a single `InstitutionTypeDTO`. Returns `404` if not found.
+
+---
+
+## Submit a new institution request
+
+Submit a request to add a new institution to the CLARISA registry. The request enters a review queue and must be approved by a MARLO administrator.
+
+```
+POST /api/v2/controllist/{CGIAREntity}/institutions/institution-requests
+```
+
+Requires `FULL_CREATE_REST_API_PERMISSION`.
+
+### Path parameters
+
+<ParamField path="CGIAREntity" type="string" required>
+  CGIAR entity acronym on whose behalf the request is made.
+</ParamField>
+
+### Request body (`NewInstitutionDTO`)
+
+<ParamField body="name" type="string" required>
+  Full name of the institution.
+</ParamField>
+<ParamField body="acronym" type="string">
+  Institution acronym.
+</ParamField>
+<ParamField body="websiteLink" type="string">
+  Institution website URL.
+</ParamField>
+<ParamField body="institutionTypeCode" type="string" required>
+  The institution type code string. Use `GET /institution-types` to look up valid codes.
+</ParamField>
+<ParamField body="hqCountryIso" type="string" required>
+  ISO Alpha-2 country code for the institution's headquarters (e.g., `"KE"` for Kenya).
+</ParamField>
+<ParamField body="externalUserMail" type="string" required>
+  Email address of the person submitting the request.
+</ParamField>
+<ParamField body="externalUserName" type="string">
+  Name of the person submitting the request.
+</ParamField>
+<ParamField body="externalUserComments" type="string">
+  Additional comments from the requester.
+</ParamField>
+
+**Example:**
+
+```bash
+curl --request POST \
+  --url 'https://your-marlo-host/api/v2/controllist/CCAFS/institutions/institution-requests' \
+  --header 'Authorization: Bearer <your-token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "name": "East African Farmers Federation",
+    "acronym": "EAFF",
+    "websiteLink": "https://eaffu.org",
+    "institutionTypeCode": "501",
+    "hqCountryIso": "KE",
+    "externalUserMail": "partner@example.org",
+    "externalUserName": "Jane Smith",
+    "externalUserComments": "Requested for CCAFS partnership project."
+  }'
+```
+
+Returns an `InstitutionRequestDTO` with the request status.
+
+---
+
+## List institution requests for a CGIAR entity
+
+Retrieve all pending institution requests submitted under a CGIAR entity.
+
+```
+GET /api/v2/controllist/{CGIAREntity}/institutions/institution-all-requests
+```
+
+Requires `FULL_READ_REST_API_PERMISSION`.
+
+### Path parameters
+
+<ParamField path="CGIAREntity" type="string" required>
+  CGIAR entity acronym.
+</ParamField>
+
+Returns a JSON array of `InstitutionRequestDTO` objects.
+
+<ResponseField name="id" type="number">
+  Internal request ID.
+</ResponseField>
+<ResponseField name="partnerName" type="string">
+  Name of the requested institution.
+</ResponseField>
+<ResponseField name="acronym" type="string">
+  Acronym of the requested institution.
+</ResponseField>
+<ResponseField name="webPage" type="string">
+  Website of the requested institution.
+</ResponseField>
+<ResponseField name="requestStatus" type="string">
+  Current status of the request (e.g., `Pending`, `Accepted`, `Rejected`).
+</ResponseField>
+<ResponseField name="requestJustification" type="string">
+  Rejection justification (populated when rejected).
+</ResponseField>
+<ResponseField name="countryDTO" type="object">
+  Headquarter country information.
+</ResponseField>
+<ResponseField name="institutionTypeDTO" type="object">
+  Institution type information.
+</ResponseField>
+<ResponseField name="institutionDTO" type="object">
+  Populated after acceptance — the resulting `InstitutionDTO` record in CLARISA.
+</ResponseField>
+<ResponseField name="externalUserMail" type="string">
+  Email of the requester.
+</ResponseField>
+<ResponseField name="externalUserName" type="string">
+  Name of the requester.
+</ResponseField>
+<ResponseField name="externalUserComments" type="string">
+  Comments from the requester.
+</ResponseField>
+
+---
+
+## Get a specific institution request by ID
+
+```
+GET /api/v2/controllist/{CGIAREntity}/institutions/institution-requests/{requestId}
+```
+
+### Path parameters
+
+<ParamField path="CGIAREntity" type="string" required>
+  CGIAR entity acronym.
+</ParamField>
+
+<ParamField path="requestId" type="number" required>
+  Institution request ID.
+</ParamField>
+
+Returns a single `InstitutionRequestDTO`. Returns `404` if not found.
+
+---
+
+## Accept or reject an institution request
+
+Approve or reject a pending institution request. This action is typically performed by a MARLO administrator.
+
+```
+POST /api/v2/controllist/{CGIAREntity}/institutions/accept-institution-request/{code}
+```
+
+Requires `FULL_CREATE_REST_API_PERMISSION`.
+
+### Path parameters
+
+<ParamField path="CGIAREntity" type="string" required>
+  CGIAR entity acronym.
+</ParamField>
+
+<ParamField path="code" type="number" required>
+  Institution request ID.
+</ParamField>
+
+### Query parameters
+
+<ParamField query="accept" type="boolean" required>
+  `true` to accept the request; `false` to reject it.
+</ParamField>
+
+<ParamField query="justification" type="string">
+  Required when rejecting (`accept=false`). Reason for rejection.
+</ParamField>
+
+**Example — accept:**
+
+```bash
+curl --request POST \
+  --url 'https://your-marlo-host/api/v2/controllist/CCAFS/institutions/accept-institution-request/77?accept=true' \
+  --header 'Authorization: Bearer <your-token>'
+```
+
+**Example — reject:**
+
+```bash
+curl --request POST \
+  --url 'https://your-marlo-host/api/v2/controllist/CCAFS/institutions/accept-institution-request/77?accept=false&justification=Duplicate+of+existing+institution+code+122' \
+  --header 'Authorization: Bearer <your-token>'
+```
+
+Returns an `InstitutionRequestDTO` with the updated `requestStatus`. Returns `404` if the request ID is not found.
+
+---
+
+## Submit a country office request
+
+Request the addition of a new country office location for an existing institution.
+
+```
+POST /api/v2/controllist/{CGIAREntity}/institutions/country-office-requests
+```
+
+Requires `FULL_CREATE_REST_API_PERMISSION`.
+
+### Request body (`NewCountryOfficeRequestDTO`)
+
+<ParamField body="institutionCode" type="number" required>
+  CLARISA code of the institution to which the office should be added.
+</ParamField>
+<ParamField body="countryIso" type="string" required>
+  ISO Alpha-2 country code for the new office location.
+</ParamField>
+<ParamField body="externalUserMail" type="string" required>
+  Email of the person submitting the request.
+</ParamField>
+<ParamField body="externalUserName" type="string">
+  Name of the person submitting the request.
+</ParamField>
+<ParamField body="externalUserComments" type="string">
+  Additional comments.
+</ParamField>
+
+**Example:**
+
+```bash
+curl --request POST \
+  --url 'https://your-marlo-host/api/v2/controllist/CCAFS/institutions/country-office-requests' \
+  --header 'Authorization: Bearer <your-token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "institutionCode": 122,
+    "countryIso": "ET",
+    "externalUserMail": "partner@example.org",
+    "externalUserName": "Jane Smith"
+  }'
+```
+
+Returns a `CountryOfficeRequestDTO` with the new request details.
+
+---
+
+## Get a country office request by ID
+
+```
+GET /api/v2/controllist/{CGIAREntity}/institutions/country-office-requests/{requestId}
+```
+
+### Path parameters
+
+<ParamField path="CGIAREntity" type="string" required>
+  CGIAR entity acronym.
+</ParamField>
+
+<ParamField path="requestId" type="number" required>
+  Country office request ID.
+</ParamField>
+
+Returns a `CountryOfficeRequestDTO`. Returns `404` if not found.
+
+---
+
+## Common error codes
+
+| HTTP status | Meaning |
+|---|---|
+| `200` | Success |
+| `404` | Institution, type, or request not found |
+| `401` | Missing or expired token |
+| `403` | Token valid but insufficient permissions |
+| `400` | Request body validation failed (e.g., missing required `name`, invalid email format) |

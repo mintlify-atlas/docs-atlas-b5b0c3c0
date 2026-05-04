@@ -1,0 +1,416 @@
+---
+title: "Querying and submitting deliverables via REST API"
+description: "MARLO publications REST API — list, create, update, and delete deliverables via /{CGIAREntity}/publications. Includes curl examples and DTO field definitions."
+---
+
+MARLO tracks research deliverables as publications in two categories: **peer-reviewed publications** (ISI journal articles and open-access outputs) and **other publication types** (reports, datasets, and other deliverable formats). The deliverables API maps to the "Table 6 - Peer-reviewed publications" reporting section and exposes five CRUD endpoints plus a Web of Science (WOS) validation utility.
+
+All publication endpoints are scoped to a CGIAR entity and require a valid QA token. See [Authentication](/api/authentication) for token setup.
+
+---
+
+## List all publications
+
+Retrieve all publications for a CGIAR entity within a reporting year and phase.
+
+```
+GET /api/v2/controllist/{CGIAREntity}/publications
+```
+
+### Path parameters
+
+<ParamField path="CGIAREntity" type="string" required>
+  Acronym of the CGIAR program, platform, or center (e.g., `CCAFS`, `HarvestPlus`).
+</ParamField>
+
+### Query parameters
+
+<ParamField query="year" type="integer" required>
+  Reporting year (e.g., `2023`).
+</ParamField>
+
+<ParamField query="phase" type="string" required>
+  Reporting phase. Use `AR` for Annual Report or `POWB` for Plan of Work and Budget.
+</ParamField>
+
+### Response
+
+Returns a JSON array of `PublicationDTO` objects.
+
+<ResponseField name="id" type="number">
+  Internal MARLO deliverable ID.
+</ResponseField>
+<ResponseField name="title" type="string">
+  Title of the publication.
+</ResponseField>
+<ResponseField name="journal" type="string">
+  Journal or publisher name.
+</ResponseField>
+<ResponseField name="volume" type="string">
+  Volume identifier.
+</ResponseField>
+<ResponseField name="issue" type="string">
+  Issue number.
+</ResponseField>
+<ResponseField name="npages" type="string">
+  Number of pages.
+</ResponseField>
+<ResponseField name="isOpenAccess" type="boolean">
+  Whether the publication is open access.
+</ResponseField>
+<ResponseField name="isISIJournal" type="boolean">
+  Whether this is an ISI-indexed journal article.
+</ResponseField>
+<ResponseField name="doi" type="string">
+  Digital Object Identifier.
+</ResponseField>
+<ResponseField name="handle" type="string">
+  Handle repository URL.
+</ResponseField>
+<ResponseField name="articleURL" type="string">
+  Direct URL to the article.
+</ResponseField>
+<ResponseField name="authors" type="string">
+  Free-text authors field.
+</ResponseField>
+<ResponseField name="authorlist" type="object[]">
+  Structured list of `DeliverableUserDTO` author objects.
+</ResponseField>
+<ResponseField name="year" type="number">
+  Year of publication.
+</ResponseField>
+<ResponseField name="phase" type="object">
+  <Expandable title="PhaseDTO fields">
+    <ResponseField name="name" type="string">Phase name (`AR` or `POWB`).</ResponseField>
+    <ResponseField name="year" type="number">Phase year.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+**Example:**
+
+```bash
+curl --request GET \
+  --url 'https://your-marlo-host/api/v2/controllist/CCAFS/publications?year=2023&phase=AR' \
+  --header 'Authorization: Bearer <your-token>'
+```
+
+---
+
+## Get a publication by ID
+
+Retrieve a single publication record.
+
+```
+GET /api/v2/controllist/{CGIAREntity}/publications/{id}
+```
+
+### Path parameters
+
+<ParamField path="CGIAREntity" type="string" required>
+  CGIAR entity acronym.
+</ParamField>
+
+<ParamField path="id" type="number" required>
+  MARLO deliverable ID.
+</ParamField>
+
+### Query parameters
+
+<ParamField query="year" type="integer" required>
+  Reporting year.
+</ParamField>
+
+<ParamField query="phase" type="string" required>
+  Reporting phase (`AR` or `POWB`).
+</ParamField>
+
+**Example:**
+
+```bash
+curl --request GET \
+  --url 'https://your-marlo-host/api/v2/controllist/CCAFS/publications/1024?year=2023&phase=AR' \
+  --header 'Authorization: Bearer <your-token>'
+```
+
+Returns a single `PublicationDTO` object (same schema as the list endpoint). Returns `404` if no deliverable matches the ID, entity, year, and phase combination.
+
+---
+
+## Create a publication
+
+Create a new peer-reviewed publication record.
+
+```
+POST /api/v2/controllist/{CGIAREntity}/publications
+```
+
+Requires `FULL_CREATE_REST_API_PERMISSION`.
+
+### Path parameters
+
+<ParamField path="CGIAREntity" type="string" required>
+  CGIAR entity acronym.
+</ParamField>
+
+### Request body (`NewPublicationDTO`)
+
+<ParamField body="title" type="string">
+  Title of the publication.
+</ParamField>
+<ParamField body="journal" type="string">
+  Journal or publisher name.
+</ParamField>
+<ParamField body="volume" type="string">
+  Volume identifier.
+</ParamField>
+<ParamField body="issue" type="string">
+  Issue number.
+</ParamField>
+<ParamField body="npages" type="string">
+  Number of pages.
+</ParamField>
+<ParamField body="isOpenAccess" type="boolean">
+  Whether the publication is open access.
+</ParamField>
+<ParamField body="isISIJournal" type="boolean">
+  Whether this is an ISI-indexed journal article.
+</ParamField>
+<ParamField body="doi" type="string">
+  Digital Object Identifier.
+</ParamField>
+<ParamField body="handle" type="string">
+  Handle repository URL.
+</ParamField>
+<ParamField body="articleURL" type="string">
+  Direct URL to the article.
+</ParamField>
+<ParamField body="authors" type="string">
+  Free-text authors field.
+</ParamField>
+<ParamField body="authorlist" type="object[]">
+  Structured list of author objects. Each object is a `DeliverableUserDTO`.
+</ParamField>
+<ParamField body="year" type="integer">
+  Year of publication.
+</ParamField>
+<ParamField body="phase" type="object" required>
+  Phase object identifying the reporting cycle.
+  <Expandable title="PhaseDTO fields">
+    <ParamField body="name" type="string" required>Phase name (`AR` or `POWB`).</ParamField>
+    <ParamField body="year" type="integer" required>Phase year.</ParamField>
+  </Expandable>
+</ParamField>
+
+**Example:**
+
+```bash
+curl --request POST \
+  --url 'https://your-marlo-host/api/v2/controllist/CCAFS/publications' \
+  --header 'Authorization: Bearer <your-token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "title": "Climate-smart agriculture adoption in sub-Saharan Africa",
+    "journal": "Nature Food",
+    "volume": "4",
+    "issue": "2",
+    "npages": "12",
+    "isOpenAccess": true,
+    "isISIJournal": true,
+    "doi": "10.1038/s43016-023-00123-4",
+    "year": 2023,
+    "phase": {
+      "name": "AR",
+      "year": 2023
+    }
+  }'
+```
+
+Returns the numeric ID (`Long`) of the newly created deliverable.
+
+---
+
+## Update a publication
+
+Update an existing peer-reviewed publication.
+
+```
+PUT /api/v2/controllist/{CGIAREntity}/publications/{id}
+```
+
+Requires `FULL_READ_REST_API_PERMISSION`.
+
+### Path parameters
+
+<ParamField path="CGIAREntity" type="string" required>
+  CGIAR entity acronym.
+</ParamField>
+
+<ParamField path="id" type="number" required>
+  MARLO deliverable ID to update.
+</ParamField>
+
+### Request body
+
+Same fields as `POST /publications` (`NewPublicationDTO`). Provide all fields you want to retain — omitted fields may be cleared.
+
+**Example:**
+
+```bash
+curl --request PUT \
+  --url 'https://your-marlo-host/api/v2/controllist/CCAFS/publications/1024' \
+  --header 'Authorization: Bearer <your-token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "title": "Climate-smart agriculture adoption in sub-Saharan Africa (revised)",
+    "journal": "Nature Food",
+    "doi": "10.1038/s43016-023-00123-4",
+    "isOpenAccess": true,
+    "isISIJournal": true,
+    "year": 2023,
+    "phase": { "name": "AR", "year": 2023 }
+  }'
+```
+
+Returns the numeric ID of the updated deliverable.
+
+---
+
+## Delete a publication
+
+Delete a publication record by ID.
+
+```
+DELETE /api/v2/controllist/{CGIAREntity}/publications/{id}
+```
+
+Requires `FULL_READ_REST_API_PERMISSION`.
+
+### Path parameters
+
+<ParamField path="CGIAREntity" type="string" required>
+  CGIAR entity acronym.
+</ParamField>
+
+<ParamField path="id" type="number" required>
+  MARLO deliverable ID.
+</ParamField>
+
+### Query parameters
+
+<ParamField query="year" type="integer" required>
+  Reporting year.
+</ParamField>
+
+<ParamField query="phase" type="string" required>
+  Reporting phase (`AR` or `POWB`).
+</ParamField>
+
+**Example:**
+
+```bash
+curl --request DELETE \
+  --url 'https://your-marlo-host/api/v2/controllist/CCAFS/publications/1024?year=2023&phase=AR' \
+  --header 'Authorization: Bearer <your-token>'
+```
+
+Returns the deleted `PublicationDTO` on success. Returns `404` if the record is not found.
+
+---
+
+## Create an "other" publication
+
+Create a publication of a non-peer-reviewed deliverable type (reports, datasets, etc.).
+
+```
+POST /api/v2/controllist/{CGIAREntity}/publicationsOther
+```
+
+Requires `FULL_CREATE_REST_API_PERMISSION`.
+
+### Request body (`NewPublicationOtherDTO`)
+
+<ParamField body="title" type="string">
+  Title of the deliverable.
+</ParamField>
+<ParamField body="type" type="number">
+  Deliverable type ID. Use the `GeneralLists` controller to look up valid type codes.
+</ParamField>
+<ParamField body="authorlist" type="object[]">
+  Structured list of `DeliverableUserDTO` author objects.
+</ParamField>
+<ParamField body="authors" type="string">
+  Free-text authors field.
+</ParamField>
+<ParamField body="year" type="integer">
+  Year of publication.
+</ParamField>
+<ParamField body="isOpenAccess" type="boolean">
+  Whether the deliverable is open access.
+</ParamField>
+<ParamField body="doi" type="string">
+  Digital Object Identifier.
+</ParamField>
+<ParamField body="handle" type="string">
+  Handle repository URL.
+</ParamField>
+<ParamField body="articleURL" type="string">
+  Direct URL to the deliverable.
+</ParamField>
+<ParamField body="phase" type="object" required>
+  <Expandable title="PhaseDTO fields">
+    <ParamField body="name" type="string" required>Phase name.</ParamField>
+    <ParamField body="year" type="integer" required>Phase year.</ParamField>
+  </Expandable>
+</ParamField>
+
+Returns the numeric ID of the created deliverable.
+
+---
+
+## Update an "other" publication
+
+```
+PUT /api/v2/controllist/{CGIAREntity}/publicationsOther/{id}
+```
+
+Requires `FULL_READ_REST_API_PERMISSION`. Same request body as `POST /publicationsOther`. Returns the numeric ID of the updated deliverable.
+
+---
+
+## Validate a publication against Web of Science
+
+Look up a WOS record by URL to validate metadata before submission.
+
+```
+GET /api/v2/controllist/publicationsWOS
+```
+
+This endpoint is **not** entity-scoped.
+
+### Query parameters
+
+<ParamField query="url" type="string" required>
+  The Web of Science article URL to validate.
+</ParamField>
+
+**Example:**
+
+```bash
+curl --request GET \
+  --url 'https://your-marlo-host/api/v2/controllist/publicationsWOS?url=https%3A%2F%2Fwww.webofscience.com%2Fwos%2Fwoscc%2Ffull-record%2FWOS%3A000123456789' \
+  --header 'Authorization: Bearer <your-token>'
+```
+
+Returns a `PublicationsWOSDTO` object with enriched metadata from the WOS index. Returns `404` if the URL is not found in WOS.
+
+---
+
+## Common error codes
+
+| HTTP status | Meaning |
+|---|---|
+| `200` | Success |
+| `404` | Deliverable not found for the given ID, entity, year, and phase |
+| `401` | Missing or expired token |
+| `403` | Token valid but insufficient permissions |
+| `400` | Request body validation failed (e.g., missing required `phase` field) |

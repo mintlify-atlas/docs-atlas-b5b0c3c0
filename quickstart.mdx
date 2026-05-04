@@ -1,81 +1,130 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
-icon: 'rocket'
+title: "Get started: log in and complete your first MARLO plan"
+description: "Log in, navigate to your program, and complete your first planning task — an end-to-end walkthrough for cluster coordinators and PMU staff."
 ---
 
-## Get started in three steps
+MARLO organizes agricultural research work into annual **phases**: POWB (Plan of Work and Budget), UpKeep (mid-year monitoring), and Annual Report. Each time you log in, the platform shows you the active phase for your program and which sections still need your attention. This page walks you through accessing MARLO, understanding the phase you are in, finding your cluster, and completing your first planning task.
 
-Get your documentation site running locally and make your first customization.
+<Note>
+  MARLO is a browser-based application. You do not need to install anything. Access requires network connectivity — either a direct CGIAR network connection or the appropriate VPN for your environment (GlobalProtect for production, FortiClient for the test environment).
+</Note>
 
-### Step 1: Set up your local environment
+## Before you begin
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+Confirm the following before logging in for the first time:
 
-### Step 2: Deploy your changes
+- You have a CGIAR Active Directory account **or** an internal MARLO account issued by your program's admin.
+- You know which program (CRP, Platform, or Center) you belong to — for example, AICCRA or CCAFS.
+- You have been assigned a role in that program. If you are unsure, contact your PMU or send a request to [Marlosupport@cgiar.org](mailto:Marlosupport@cgiar.org).
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+## Walkthrough
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+<Steps>
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+<Step title="Open MARLO in your browser">
 
-### Step 3: Go live
+Navigate to the MARLO URL for your program. Ask your PMU or admin for the exact URL — it is specific to your deployment (for example, `https://aiccra.marlo.cgiar.org`).
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+<Tip>
+  Bookmark the URL once you are in. MARLO is desktop-first; use a laptop or desktop browser for the best experience with data-entry forms.
+</Tip>
+</Step>
+
+<Step title="Log in">
+
+On the login screen, enter your **CGIAR Active Directory credentials** (the same username and password you use for CGIAR email and other CGIAR tools).
+
+If your program uses internal MARLO accounts instead of CGIAR AD, use the username and password provided by your admin.
+
+<Note>
+  If login fails, verify that you are connected to the required network or VPN. Production environments require GlobalProtect VPN when connecting from outside the CGIAR network. The test environment requires FortiClient VPN.
+</Note>
+</Step>
+
+<Step title="Identify the active phase">
+
+After logging in you land on the **Home Dashboard**. Look for the **phase chip** in the page header — it displays the current phase and year, for example `POWB 2026` or `AR 2025`.
+
+The phase chip tells you:
+
+- **POWB** — you are in annual planning. Fill in cluster activities, deliverables, and budgets for the coming year.
+- **UpKeep** — you are in mid-year monitoring. Update progress against what was planned.
+- **Annual Report (AR)** — you are in end-of-year reporting. Confirm deliverables, attach evidence, and complete narrative sections.
+
+<Warning>
+  Past phases are read-only. You can view prior years for reference, but any edits you make apply only to the current and future phases. Changes never modify historical records.
+</Warning>
+
+The dashboard also shows a list of **incomplete sections** for your cluster. This is your to-do list for the active phase.
+</Step>
+
+<Step title="Navigate to your program and cluster">
+
+1. In the **main menu**, confirm the program name shown in the header. If you have access to more than one program, use the **Global Unit selector** in the header to switch.
+2. In the left or top navigation, click **Projects** (also labeled "Clusters" in some deployments).
+3. Find your cluster in the list and click its name to open the cluster workspace.
+
+Each cluster has its own set of sections: Description, Partners, Locations, Activities, Deliverables, Innovations, OICRs, Studies, and more. The left submenu lists all sections for your cluster.
+
+<Tip>
+  If you do not see your cluster in the list, your role may not be linked to it yet. Ask your program admin to assign you to the cluster in User Management.
+</Tip>
+</Step>
+
+<Step title="Complete your first planning task">
+
+The most common first task during POWB is adding a **deliverable** — a knowledge product, tool, or service your cluster plans to produce in the year. Here is how:
+
+1. In the cluster submenu, click **Deliverables**.
+2. Click **Add deliverable** (the button label may vary by program configuration).
+3. Fill in the required fields:
+   - **Title** — a clear, descriptive name for the deliverable.
+   - **Type** — select the deliverable type from the dropdown (for example, Journal Article, Dataset, Training Material).
+   - **Year** — the expected delivery year.
+   - **Open Access intent** — whether the output will be published openly (required for FAIR compliance tracking).
+4. Click **Save**.
+
+MARLO saves the deliverable to the active phase. It automatically replicates to future phases, so you do not need to re-enter it when the UpKeep or AR phase opens.
+
+<Note>
+  Some fields are required for QA submission. Incomplete sections are flagged on the dashboard. You can save a partial record and return to complete it before submitting for review.
+</Note>
+</Step>
+
+<Step title="Submit for QA review">
+
+When all sections for your cluster are complete, submit your cluster plan so QA reviewers can provide structured feedback.
+
+1. Return to the **Home Dashboard** and check that all incomplete-section warnings are resolved.
+2. Click **Submit** (or the equivalent action shown in your program's configuration).
+3. Your cluster status moves to *Awaiting QA*. QA reviewers will receive your items in their review queue.
+
+You will receive a notification when a reviewer marks a section as validated or requests a revision.
+</Step>
+
+</Steps>
+
+## What happens to your data between phases
+
+MARLO uses **forward-only phase replication**: everything you enter in POWB carries over to UpKeep and then to Annual Report. When the AR phase opens, you see your planned deliverables pre-populated, ready for you to confirm or update them with actual outcomes and evidence. You never start from scratch.
+
+<Note>
+  If you need to correct something in a past phase (for example, a planning record from last year's POWB), contact your program admin or PMU. Past phases are immutable by design to preserve the audit trail.
+</Note>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Annual planning workflow" icon="calendar-check" href="/workflows/annual-planning">
+    A detailed walkthrough of all cluster sections during the POWB phase
+  </Card>
+  <Card title="Annual reporting workflow" icon="file-lines" href="/workflows/annual-reporting">
+    How to confirm deliverables, attach evidence, and complete AR sections
+  </Card>
+  <Card title="Quality assurance" icon="shield-check" href="/workflows/quality-assurance">
+    How QA reviewers evaluate submissions and how you respond to feedback
+  </Card>
+  <Card title="Platform architecture" icon="diagram-project" href="/architecture">
+    Understand the phase model, multi-tenant structure, and data flow
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

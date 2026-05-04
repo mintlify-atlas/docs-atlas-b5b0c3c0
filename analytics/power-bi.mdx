@@ -1,0 +1,86 @@
+---
+title: "MARLO Power BI dashboards: results and QA analytics"
+description: "Explore MARLO's built-in BI hub to monitor results, quality assurance, and program completeness through role-based Power BI dashboards."
+---
+
+MARLO ships a dedicated Business Intelligence hub at `/bi/{crp}/bi` that gives PMU leads, cluster coordinators, QA reviewers, and public readers access to live Power BI dashboards drawn from MARLO's operational data. Rather than rebuilding analytics inside the transactional UI, MARLO routes data through a Microsoft Fabric Lakehouse pipeline so every dashboard reflects a consistently structured, quality-gated view of program activity.
+
+## Dashboard types
+
+<CardGroup cols={2}>
+  <Card title="Results dashboard" icon="chart-bar">
+    Shows program-wide deliverables, innovations, and OICRs across clusters. Useful for cluster leads and PMU to track output volume, open-access compliance rates, and Scaling Readiness distribution in near real time.
+  </Card>
+  <Card title="QA dashboard" icon="shield-check">
+    Tracks quality assurance throughput — pending items, validated counts, first-response times, and resolution rates per cluster and section. Refreshes every 30 minutes during active QA periods to support SLA monitoring.
+  </Card>
+  <Card title="Completeness dashboard" icon="circle-check">
+    Provides PMU with a cluster-by-cluster view of which sections are complete, incomplete, or awaiting submission before each phase deadline. The primary tool for chasing late entries.
+  </Card>
+  <Card title="Public embed" icon="globe">
+    Delivers selected dashboards externally without requiring a MARLO login. Used for program transparency commitments — for example, the "Deliverables by the Numbers" view embedded on public-facing pages. Powered by the Power BI JavaScript embed API.
+  </Card>
+</CardGroup>
+
+## Data architecture: Bronze → Silver → Gold
+
+MARLO's analytical data flows through a [Microsoft Fabric](https://learn.microsoft.com/en-us/fabric/) Lakehouse in three layers before reaching Power BI:
+
+| Layer | Contents | Role |
+|---|---|---|
+| **Bronze** | Raw extracts from MySQL (AWS RDS) | Ingestion; no transformation. Preserves source fidelity. |
+| **Silver** | Cleansed, typed, and joined tables | Conformed dimensions and facts; phase and cluster context applied. |
+| **Gold** | Aggregated, report-ready views | Powers dashboard visuals directly. Enforces metric definitions. |
+
+This separation means dashboard consumers always see data that has passed through a consistent transformation contract, not ad-hoc queries against the live transactional database.
+
+<Note>
+Dashboard data reflects the most recent completed pipeline run. The Results dashboard refreshes on a cadence of **≤ 8 hours**. The QA dashboard refreshes every **≤ 30 minutes** during active reporting or QA periods. Figures you see in the BI hub may therefore lag the transactional MARLO UI by up to those intervals.
+</Note>
+
+## Role-based access
+
+Which dashboards you see in the BI hub depends on your MARLO role:
+
+| Role | Visible dashboards |
+|---|---|
+| **PMU** | Results, QA, Completeness |
+| **Cluster Leader / Coordinator** | Results (filtered to own cluster), QA (own cluster) |
+| **QA Reviewer** | QA dashboard (program-wide) |
+| **Program / CRP Admin** | All dashboards |
+| **Public reader** | Public embed only (no login required) |
+
+Access control is enforced at the MARLO action level (`BiReportsAction`) and reflected in which `BiReports` records are loaded for the current user's role and Global Unit.
+
+## Navigating to the BI hub
+
+1. Log in to MARLO and confirm the correct Global Unit (CRP / Platform / Center) is selected in the header.
+2. Open the **BI** item in the main navigation menu.
+3. You land on the BI hub (`/bi/{crp}/bi`), which lists the dashboards available to your role.
+4. Click a dashboard card to open the embedded Power BI report.
+
+<Tip>
+When you need a quick answer about program totals — total deliverables, open-access percentage, QA resolution rate — start with the BI hub rather than navigating the transactional cluster screens. The dashboards aggregate data across all clusters in a single view that would otherwise require opening each cluster individually.
+</Tip>
+
+## Completeness view for PMU oversight
+
+The Completeness dashboard is specifically designed for PMU leads approaching a phase deadline. It displays a traffic-light grid of clusters against required sections (Description, Deliverables, Innovations, OICRs, QA items, etc.), so PMU can identify at a glance which clusters still have open items and reach out before the cutoff.
+
+Because the completeness data derives from the same MySQL → Fabric pipeline, it reflects the state of MARLO records as of the last Bronze ingestion. PMU should factor in the ≤ 8-hour refresh lag when making final deadline decisions.
+
+## Public embed: delivering dashboards externally
+
+The public embed capability lets programs surface selected dashboards on external websites or donor portals without requiring recipients to have MARLO accounts. MARLO uses the Power BI JavaScript embed API to render the report inside a host FTL view (`bi/biDashboard.ftl`), parameterized via `BiParameters`.
+
+Typical use cases include:
+
+- A "Deliverables by the Numbers" summary on the program's public website.
+- A read-only FAIR-compliance overview shared with donor oversight bodies.
+- An innovation map embedded in a mid-term review presentation.
+
+Public dashboards expose only data that has been explicitly cleared for external sharing. They do not expose individual-level or governance-restricted fields.
+
+<Note>
+Users on small screens are routed to the direct Power BI service URL rather than the embedded view. The embedded BI experience targets desktop-class browsers.
+</Note>

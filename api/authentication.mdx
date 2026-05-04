@@ -1,0 +1,160 @@
+---
+title: "MARLO REST API: token-based authentication guide"
+description: "How to obtain a QA token for the MARLO REST API, pass it in requests, interpret 401 and 403 errors, and understand token scope tied to CRP program access."
+---
+
+The MARLO REST API uses **token-based authentication**. Every request must carry a QA token that identifies the caller and the CGIAR program (CRP, Platform, or Center) they are authorised to access. Tokens are issued via a dedicated endpoint and are scoped to a single program — a token issued for `CCAFS` cannot be used to read or write data for `HarvestPlus`.
+
+## Obtaining a QA token
+
+Tokens are issued by `POST /api/v2/controllist/qatoken/`. You must already have a MARLO user account with the REST API permission to call this endpoint.
+
+<Note>
+Tokens are tied to a CRP/Platform/Center via the `smocode` field, which is the program's SMO identifier string. A user can hold tokens for multiple programs, but each token is valid for exactly one program scope.
+</Note>
+
+### Request
+
+<ParamField body="smocode" type="string" required>
+  The SMO identifier of the CGIAR program for which the token is issued (e.g., `"CCAFS"`).
+</ParamField>
+
+<ParamField body="username" type="string" required>
+  The MARLO username of the account that will own the token.
+</ParamField>
+
+<ParamField body="email" type="string" required>
+  The email address associated with the account.
+</ParamField>
+
+<ParamField body="name" type="string">
+  The display name associated with the account.
+</ParamField>
+
+**Example request:**
+
+```bash
+curl --request POST \
+  --url https://your-marlo-host/api/v2/controllist/qatoken/ \
+  --header 'Authorization: Bearer <existing-token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "smocode": "CCAFS",
+    "username": "jane.doe",
+    "email": "jane.doe@example.org",
+    "name": "Jane Doe"
+  }'
+```
+
+### Response
+
+A successful `200 OK` response returns a `QATokenAuthDTO` object:
+
+<ResponseField name="id" type="number">
+  Internal numeric ID of the token record.
+</ResponseField>
+
+<ResponseField name="token" type="string">
+  The bearer token string to use in subsequent API calls.
+</ResponseField>
+
+<ResponseField name="crpId" type="string">
+  The CRP/program identifier the token is scoped to.
+</ResponseField>
+
+<ResponseField name="username" type="string">
+  Username of the token owner.
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  Email of the token owner.
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Display name of the token owner.
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  Token creation timestamp (`yyyy-MM-dd HH:mm:ss`, America/Bogota timezone).
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string">
+  Last update timestamp (`yyyy-MM-dd HH:mm:ss`, America/Bogota timezone).
+</ResponseField>
+
+<ResponseField name="expirationDate" type="string">
+  Token expiry timestamp (`yyyy-MM-dd HH:mm:ss`, America/Bogota timezone).
+</ResponseField>
+
+<ResponseField name="appUser" type="number">
+  Internal ID of the associated MARLO application user.
+</ResponseField>
+
+**Example response:**
+
+```json
+{
+  "id": 42,
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "crpId": "CCAFS",
+  "username": "jane.doe",
+  "email": "jane.doe@example.org",
+  "name": "Jane Doe",
+  "createdAt": "2024-01-15 09:00:00",
+  "updatedAt": "2024-01-15 09:00:00",
+  "expirationDate": "2025-01-15 09:00:00",
+  "appUser": 101
+}
+```
+
+## Using the token in API requests
+
+Pass the token as a `Bearer` token in the `Authorization` header on every API request:
+
+```bash
+curl --request GET \
+  --url 'https://your-marlo-host/api/v2/controllist/CCAFS/publications?year=2023&phase=AR' \
+  --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+```
+
+## Error responses
+
+### 401 Unauthorized
+
+The request did not include a valid token, or the token has expired.
+
+```json
+{
+  "code": "401",
+  "message": "Unauthorized"
+}
+```
+
+**Resolution:** Re-request a token via `POST /api/v2/controllist/qatoken/` or contact your MARLO administrator to issue a fresh token.
+
+### 403 Forbidden
+
+The token is valid but the authenticated user lacks the required permission for the operation. Read endpoints require `FULL_READ_REST_API_PERMISSION`; create, update, and delete endpoints require `FULL_CREATE_REST_API_PERMISSION`.
+
+```json
+{
+  "code": "403",
+  "message": "Forbidden"
+}
+```
+
+**Resolution:** Ask your MARLO administrator to grant the appropriate REST API permission to your account for the relevant program.
+
+<Warning>
+A 403 can also occur when you present a token scoped to a different program than the one in the URL path. For example, using a `HarvestPlus` token to call `GET /api/v2/controllist/CCAFS/publications` will return 403.
+</Warning>
+
+## Token scope
+
+Each QA token is scoped to a single CGIAR program identified by `crpId`. The scope controls:
+
+- **Which entity paths you can call** — only the `{CGIAREntity}` matching your token's `crpId`.
+- **Which operations are allowed** — determined by your user's permission set (`FULL_READ` vs `FULL_CREATE`).
+- **Expiry** — tokens carry an `expirationDate`. After that date, all requests return 401.
+
+Global endpoints (such as `GET /institutions` and `GET /institution-types`) do not require a program-scoped path, but still require a valid token.

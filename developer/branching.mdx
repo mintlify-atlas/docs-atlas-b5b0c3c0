@@ -1,0 +1,163 @@
+---
+title: "Git branching model and CI/CD pipeline in MARLO"
+description: "MARLO's four-tier branch hierarchy, feature branch naming rules, CI/CD pipeline via Jenkins and GitHub Actions, and the quality gates that block a merge."
+---
+
+MARLO uses a structured four-tier branching model to protect the production environment while giving contributors a clear path from idea to deployment. Every feature starts on an `aiccra-<slug>` branch, merges into `aiccra-staging` after review, and is eventually promoted to `AICCRA` (production) by the maintainers. This page covers the full hierarchy, naming conventions, CI/CD triggers, and the contribution workflow.
+
+## Branch hierarchy
+
+```
+AICCRA  (production — merge-only, no direct commits)
+  └── aiccra-staging  (stable integration — all features merge here)
+        └── aiccra-dev  (experimentation — highly unstable)
+        └── aiccra-<slug>  (feature branches — one per task or fix)
+```
+
+| Branch | Role | Commit rules |
+|---|---|---|
+| `AICCRA` | Production | Merge-only from `aiccra-staging`. **No direct commits, ever.** |
+| `aiccra-staging` | Stable integration | All feature branches merge here via PR. |
+| `aiccra-dev` | Experimentation | Highly unstable; for integration testing only. |
+| `aiccra-<slug>` | Feature / fix branches | Created from `aiccra-staging`; merged back into it. |
+
+<Warning>
+**Never push commits directly to `AICCRA`.** This is a non-negotiable hard rule. Direct commits to the production branch bypass quality gates and risk breaking a live, multi-program environment. All changes to `AICCRA` must arrive via a merge from `aiccra-staging`.
+</Warning>
+
+## Feature branch naming
+
+Feature branches follow the pattern `aiccra-<slug>`, where `<slug>` is a short, lowercase, hyphen-separated description of the work:
+
+```bash
+aiccra-deliverable-fair-flag
+aiccra-oicr-maturity-fix
+aiccra-admin-tenant-onboarding
+```
+
+If the branch targets the Java 17 codebase, include `java17` or `java_17` in the name. This signals the run scripts and CI pipeline to use the Java 17 toolchain:
+
+```bash
+aiccra-java17-spring-upgrade
+aiccra-java_17-hikari-config
+```
+
+## CI/CD pipeline
+
+### Jenkins
+
+Pushing to any branch triggers the Jenkins job named `marlo-<branch-suffix>`. For example, pushing to `aiccra-staging` triggers `marlo-aiccra-staging`. The job runs a full Maven build and deploys to the corresponding environment.
+
+Slack receives a success or failure notification after each build, so the team has immediate visibility into the integration state.
+
+### GitHub Actions
+
+Two GitHub Actions workflows run automatically on push and pull request:
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| Jenkins trigger | Push to any branch | Calls the Jenkins webhook to start the downstream build |
+| SonarCloud analysis | Push / PR | Static analysis, code smell detection, coverage reporting |
+
+Snyk also runs on the monorepo each release cycle to check for vulnerable dependencies.
+
+## Quality gates that block a merge
+
+A PR into `aiccra-staging` must pass all three gates before it can be merged:
+
+<CardGroup cols={3}>
+  <Card title="Checkstyle" icon="code">
+    Run `mvn checkstyle:check` locally before pushing. Line length, indentation, naming conventions, and file length must all pass.
+  </Card>
+  <Card title="SonarCloud" icon="chart-bar">
+    Static analysis on the PR diff. New code must not introduce blocker or critical issues. Review findings in the SonarCloud PR comment.
+  </Card>
+  <Card title="Snyk" icon="shield">
+    Dependency vulnerability scan. New or upgraded dependencies must not introduce high-severity CVEs.
+  </Card>
+</CardGroup>
+
+## Contribution workflow
+
+<Steps>
+
+<Step title="Read the constitutional documents">
+
+Before writing any code, read `AGENTS.md` and `CLAUDE.md` at the repository root. They define the hard rules, code style, naming conventions, and specificity workflow that every contributor must follow.
+
+</Step>
+
+<Step title="Branch from aiccra-staging">
+
+Always create your feature branch from the current `aiccra-staging`, not from `aiccra-dev` or `AICCRA`:
+
+```bash
+git checkout aiccra-staging
+git pull origin aiccra-staging
+git checkout -b aiccra-<your-slug>
+```
+
+</Step>
+
+<Step title="Draft the spec">
+
+MARLO uses Spec-Driven Development. Before implementing, create the spec files under `docs/specs/`:
+
+```
+docs/specs/domain/<module>/requirements.md   # what and why
+docs/specs/domain/<module>/design.md          # how
+docs/specs/domain/<module>/task.md            # implementation checklist
+```
+
+Get the spec reviewed before you start coding.
+
+</Step>
+
+<Step title="Implement and keep task.md up to date">
+
+Work through the implementation checklist in `task.md`, adding verification notes as you complete each item. If your change alters routing, validation, phase replication, or frontend composition, update the relevant `reports/ai-context/*.md` runbook.
+
+</Step>
+
+<Step title="Run local quality gates">
+
+```bash
+# Must pass before opening a PR
+mvn checkstyle:check
+
+# Run the test suite
+mvn test
+```
+
+Fix all Checkstyle violations before pushing. SonarCloud will flag new issues even if the local check passed, so review the SonarCloud report after your first push.
+
+</Step>
+
+<Step title="Open a PR into aiccra-staging">
+
+Push your branch and open a pull request targeting `aiccra-staging` (not `AICCRA`). The PR description should reference the spec and summarise the change. Wait for Checkstyle, SonarCloud, and Snyk to all pass before requesting a review.
+
+```bash
+git push -u origin aiccra-<your-slug>
+# then open the PR on GitHub
+```
+
+</Step>
+
+<Step title="Address review feedback">
+
+Push additional commits to the same branch to address reviewer comments. The CI gates re-run on each push. Do not force-push after a review has started.
+
+</Step>
+
+</Steps>
+
+## Promotion to production
+
+Only maintainers (IBD Team) merge `aiccra-staging` into `AICCRA`. This is done as a regular merge commit after:
+
+1. All pending feature PRs on `aiccra-staging` are merged and CI is green.
+2. The staging environment has been smoke-tested.
+3. The team has agreed on the release scope.
+
+Contributors do not need to take any action for the promotion step.

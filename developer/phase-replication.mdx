@@ -1,0 +1,238 @@
+---
+title: "Phase replication contract in MARLO ManagerImpl"
+description: "MARLO saves propagate forward through phases automatically. Each ManagerImpl must enforce forward-only replication with symmetric save and delete paths."
+---
+
+MARLO's data model is phase-aware: every significant entity carries an explicit `phase_id` foreign key that ties it to a specific planning or reporting cycle. When a user saves a record in the PLANNING phase, that change must appear in all subsequent phases so that nothing is silently lost as the program moves forward in time. This forward propagation is the phase replication contract, and it lives inside each `ManagerImpl` class in `marlo-data`.
+
+## What phases are
+
+The `phases` table enumerates every cycle moment for every global unit. Phases form a linked list: each phase record has a `next` relationship pointing to the immediately following cycle. The phase types used for replication decisions are:
+
+- `PLANNING` — the initial annual planning cycle.
+- `REPORTING` — the mid-year or end-of-year reporting cycle.
+- `UpKeep` — the carry-forward phase that sits between REPORTING and the next PLANNING cycle (reached via `phase.getNext().getNext()` from REPORTING).
+
+<Note>
+Replication is strictly forward-only. A save in a PLANNING phase propagates to every later phase through the linked list but never touches phases that already closed. Past phases are immutable and fully auditable.
+</Note>
+
+## The five replication rules
+
+Every `ManagerImpl` that handles a phase-aware entity must implement all five rules:
+
+1. **PLANNING save** → replicate the record to every phase reachable through `phase.getNext()` until the chain is exhausted.
+2. **PLANNING delete** → remove the record from every next phase in the same chain.
+3. **REPORTING save** → replicate to `phase.getNext().getNext()` (the UpKeep phase) and recurse forward from there.
+4. **REPORTING delete** → remove from the UpKeep phase chain forward.
+5. **Section-specific skip flags** (for example, `isPublication` on deliverables) must be checked before any replication runs, and replication must be skipped when the flag is set.
+6. **Duplicate prevention** — before inserting into a target phase, filter the existing records to confirm the entity does not already exist for that phase.
+
+## Canonical implementation
+
+`DeliverableFundingSourceManagerImpl` in `marlo-data/src/main/java/org/cgiar/ccafs/marlo/data/manager/impl/DeliverableFundingSourceManagerImpl.java` is the reference implementation. The full class is reproduced below with inline annotations:
+
+### Save path
+
+```java
+@Override
+public DeliverableFundingSource saveDeliverableFundingSource(
+    DeliverableFundingSource deliverableFundingSource) {
+
+  // 1. Persist the record for the current phase
+  DeliverableFundingSource deliverableFundingSourceDB =
+      deliverableFundingSourceDAO.save(deliverableFundingSource);
+
+  Phase currentPhase =
+      phaseDao.find(deliverableFundingSourceDB.getPhase().getId());
+
+  // 2. Skip replication entirely for publication deliverables
+  boolean isPublication =
+      deliverableFundingSourceDB.getDeliverable().getIsPublication() != null
+      && deliverableFundingSourceDB.getDeliverable().getIsPublication();
+
+  // 3. PLANNING: replicate from the very next phase forward
+  if (currentPhase.getDescription().equals(APConstants.PLANNING)
+      && currentPhase.getNext() != null && !isPublication) {
+    if (deliverableFundingSource.getPhase().getNext() != null) {
+      this.addDeliverableFundingSourcePhase(
+          deliverableFundingSource.getPhase().getNext(),
+          deliverableFundingSource.getDeliverable().getId(),
+          deliverableFundingSource);
+    }
+  }
+
+  // 4. REPORTING: replicate from UpKeep (next.next) forward
+  if (currentPhase.getDescription().equals(APConstants.REPORTING)
+      && !isPublication) {
+    if (currentPhase.getNext() != null
+        && currentPhase.getNext().getNext() != null) {
+      Phase upkeepPhase = currentPhase.getNext().getNext();
+      if (upkeepPhase != null) {
+        this.addDeliverableFundingSourcePhase(
+            upkeepPhase,
+            deliverableFundingSource.getDeliverable().getId(),
+            deliverableFundingSource);
+      }
+    }
+  }
+
+  return deliverableFundingSourceDB;
+}
+```
+
+The recursive helper that walks the chain:
+
+```java
+private void addDeliverableFundingSourcePhase(Phase next,
+    long deliverableID,
+    DeliverableFundingSource deliverableFundingSource) {
+
+  Phase phase = phaseDao.find(next.getId());
+
+  // Duplicate prevention: only insert if no matching record already exists
+  List<DeliverableFundingSource> deliverableFundingSources =
+      phase.getDeliverableFundingSources().stream()
+          .filter(c -> c.isActive()
+              && c.getDeliverable().getId().longValue() == deliverableID
+              && deliverableFundingSource.getFundingSource().getId()
+                  .equals(c.getFundingSource().getId()))
+          .collect(Collectors.toList());
+
+  if (deliverableFundingSources.isEmpty()) {
+    DeliverableFundingSource deliverableFundingSourceAdd =
+        new DeliverableFundingSource();
+    deliverableFundingSourceAdd.setPhase(phase);
+    deliverableFundingSourceAdd.setDeliverable(
+        deliverableFundingSource.getDeliverable());
+    deliverableFundingSourceAdd.setFundingSource(
+        deliverableFundingSource.getFundingSource());
+    deliverableFundingSourceDAO.save(deliverableFundingSourceAdd);
+  }
+
+  // Recurse: move to the next phase in the chain
+  if (phase.getNext() != null) {
+    this.addDeliverableFundingSourcePhase(
+        phase.getNext(), deliverableID, deliverableFundingSource);
+  }
+}
+```
+
+### Delete path
+
+The delete path mirrors the save path exactly. The same phase-type switch and the same recursion pattern are required:
+
+```java
+@Override
+public void deleteDeliverableFundingSource(long deliverableFundingSourceId) {
+
+  DeliverableFundingSource deliverableFundingSource =
+      this.getDeliverableFundingSourceById(deliverableFundingSourceId);
+
+  // Delete from current phase
+  deliverableFundingSourceDAO.deleteDeliverableFundingSource(
+      deliverableFundingSource.getId());
+
+  Phase currentPhase =
+      phaseDao.find(deliverableFundingSource.getPhase().getId());
+
+  boolean isPublication =
+      deliverableFundingSource.getDeliverable().getIsPublication() != null
+      && deliverableFundingSource.getDeliverable().getIsPublication();
+
+  // PLANNING: propagate delete to all next phases
+  if (currentPhase.getDescription().equals(APConstants.PLANNING)
+      && currentPhase.getNext() != null && !isPublication) {
+    if (deliverableFundingSource.getPhase().getNext() != null) {
+      this.deleteDeliverableFundingSource(
+          deliverableFundingSource.getPhase().getNext(),
+          deliverableFundingSource.getDeliverable().getId(),
+          deliverableFundingSource);
+    }
+  }
+
+  // REPORTING: propagate delete from UpKeep (next.next) forward
+  if (currentPhase.getDescription().equals(APConstants.REPORTING)
+      && !isPublication) {
+    if (currentPhase.getNext() != null
+        && currentPhase.getNext().getNext() != null) {
+      Phase upkeepPhase = currentPhase.getNext().getNext();
+      if (upkeepPhase != null) {
+        this.deleteDeliverableFundingSource(
+            upkeepPhase,
+            deliverableFundingSource.getDeliverable().getId(),
+            deliverableFundingSource);
+      }
+    }
+  }
+}
+```
+
+## Replication behavior by phase type
+
+| Current phase | Save behavior | Delete behavior |
+|---|---|---|
+| `PLANNING` | Replicate to `phase.getNext()` and recurse until `null` | Remove from `phase.getNext()` and recurse until `null` |
+| `REPORTING` | Replicate to `phase.getNext().getNext()` (UpKeep) and recurse | Remove from `phase.getNext().getNext()` and recurse |
+| `UpKeep` | No automatic replication; UpKeep is a terminal destination for REPORTING saves | Same — removal stops at UpKeep unless a subsequent phase is linked |
+
+## Other verified implementations
+
+The same pattern appears across many manager implementations:
+
+- `ProjectInnovationOrganizationManagerImpl` — uses `saveInnovationOrganizationPhase(...)` and `deleteProjectInnovationOrganizationPhase(...)`.
+- `ProjectInnovationComplementarySolutionManagerImpl` — uses `saveProjectInnovationComplementarySolutionPhase(...)` and `deleteProjectInnovationComplementarySolutionPhase(...)`.
+
+The method naming varies (`add*Phase`, `save*Phase`, `delete*Phase`) but the structure is identical in all cases.
+
+## How to add phase replication to a new entity
+
+<Steps>
+
+<Step title="Implement the Manager interface and ManagerImpl">
+Create a Manager interface under `marlo-data/.../manager/` and a `*ManagerImpl` under `marlo-data/.../manager/impl/`. Annotate the implementation with `@Named`.
+</Step>
+
+<Step title="Inject PhaseDAO">
+The `PhaseDAO` is the only dependency needed for replication. Inject it via constructor injection alongside the entity's own DAO:
+
+```java
+@Inject
+public MyEntityManagerImpl(MyEntityDAO myEntityDAO, PhaseDAO phaseDao) {
+  this.myEntityDAO = myEntityDAO;
+  this.phaseDao = phaseDao;
+}
+```
+</Step>
+
+<Step title="Write the recursive helper methods">
+Create two private helpers — one for save replication, one for delete replication — following the pattern in `DeliverableFundingSourceManagerImpl`. Both must:
+
+- Re-fetch the phase via `phaseDao.find(next.getId())` (do not trust the detached instance).
+- Filter existing records before inserting (duplicate prevention).
+- Recurse with `if (phase.getNext() != null)`.
+</Step>
+
+<Step title="Wire the helpers into save() and delete()">
+In `saveMyEntity(...)`, after persisting the current record, check `currentPhase.getDescription()` and call the appropriate helper. Mirror this logic exactly in `deleteMyEntity(...)`.
+</Step>
+
+<Step title="Honor section-specific skip flags">
+If the entity type has a skip condition (for example, a boolean field on the parent that marks it as read-only or publication-only), load and check it before calling either helper.
+</Step>
+
+</Steps>
+
+## Risk checklist for changes to existing ManagerImpl save paths
+
+Before modifying any `ManagerImpl` that handles a phase-aware entity, verify:
+
+- [ ] The recursive propagation guard (`phase.getNext() != null`) is intact in both helpers.
+- [ ] Save and delete replication paths remain symmetric.
+- [ ] The duplicate-prevention filter is preserved when cloning records into target phases.
+- [ ] Section-specific skip rules (such as `isPublication`) are evaluated before any replication call.
+- [ ] Downstream phase consistency is verified after the change — replication that skips a link in the chain corrupts all phases after the break.
+
+<Warning>
+Never remove or weaken the `phase.getNext()` null check, the duplicate-prevention filter, or the `isPublication` (or equivalent) skip guard in an existing `ManagerImpl`. These are correctness constraints, not performance hints. A broken replication chain produces phantom data in future phases or silently drops records, and both kinds of corruption are difficult to detect and hard to repair without a database audit.
+</Warning>

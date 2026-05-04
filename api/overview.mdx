@@ -1,0 +1,140 @@
+---
+title: "MARLO REST API: endpoints, versioning, and base URL"
+description: "MARLO's Spring MVC REST API — base URL pattern, path-based versioning, all resource groups, JSON response format, and the boundary with the Struts 2 UI layer."
+---
+
+MARLO exposes a versioned REST API built on Spring MVC, running alongside the traditional Struts 2 web interface. All REST endpoints return JSON and accept JSON request bodies. The API covers the core research-output resources — publications, innovations, projects, and partner institutions — and is used by quality-assurance tooling, external data consumers, and the CGIAR reporting pipeline.
+
+## Base URL
+
+All REST v2 endpoints share the following path prefix:
+
+```
+/api/v2/controllist/
+```
+
+Most resource endpoints are scoped to a **CGIAR entity** (the acronym of a CRP, Platform, or Center), so a typical path looks like:
+
+```
+/api/v2/controllist/{CGIAREntity}/publications
+/api/v2/controllist/{CGIAREntity}/innovations
+/api/v2/controllist/{CGIAREntity}/project/{id}
+```
+
+A small number of endpoints are global (not entity-scoped):
+
+```
+/api/v2/controllist/institutions
+/api/v2/controllist/institution-types
+/api/v2/controllist/publicationsWOS
+/api/v2/controllist/qatoken/
+```
+
+<Note>
+**Spring MVC vs Struts 2 boundary** — MARLO runs two web frameworks side by side. Struts 2 handles all browser-facing page requests (URLs ending in `.do` or `.json`) and is configured in `struts.xml` and the module-specific `struts-*.xml` files. Spring MVC handles everything under `/api/*`; those paths are excluded from Struts via `struts.action.excludePattern`. When building integrations, use `/api/v2/controllist/...` paths exclusively. Never call `.do` endpoints from external systems.
+</Note>
+
+## API versioning
+
+MARLO uses **path-based versioning**. The current stable version is `v2`. The version segment appears immediately after `/api/`:
+
+```
+/api/v2/controllist/...
+```
+
+When a new major version is introduced it will live at `/api/v3/...` while `v2` remains accessible. There is no header-based or query-string version negotiation.
+
+## Authentication
+
+All endpoints require a valid QA token. Pass the token in the `Authorization` header:
+
+```bash
+Authorization: Bearer <your-token>
+```
+
+See the [Authentication](/api/authentication) page for how to obtain and use tokens.
+
+## Response format
+
+All responses are `application/json`. Successful responses return the resource object or a numeric ID for create/update operations.
+
+**Error response shape:**
+
+```json
+{
+  "code": "404",
+  "message": "Deliverable not found for the given id and phase."
+}
+```
+
+The `code` field is a stable string code. The `message` field is human-readable and may change between releases.
+
+## OpenAPI / Swagger
+
+MARLO uses the Springdoc OpenAPI library (Springfox `@Api`/`@ApiOperation` annotations in the source). The interactive Swagger UI is available at:
+
+```
+/swagger-ui/
+```
+
+The raw OpenAPI JSON specification is served at:
+
+```
+/v2/api-docs
+```
+
+These paths are relative to your MARLO deployment root.
+
+## Available resource groups
+
+<Columns cols={2}>
+  <Card title="Authentication" icon="key" href="/api/authentication">
+    Obtain and use QA tokens to authenticate REST API requests.
+  </Card>
+  <Card title="Deliverables (Publications)" icon="file-text" href="/api/deliverables">
+    Create, read, update, and delete peer-reviewed publications and other deliverable types.
+  </Card>
+  <Card title="Innovations" icon="lightbulb" href="/api/innovations">
+    Query and manage CRP innovation records, including scaling readiness and Sub-IDO linkages.
+  </Card>
+  <Card title="Projects" icon="folder" href="/api/projects">
+    Look up MARLO project records by ID within a CGIAR entity.
+  </Card>
+  <Card title="Institutions" icon="building" href="/api/institutions">
+    Browse partner institutions, submit new institution requests, and manage country office requests.
+  </Card>
+</Columns>
+
+## Other available controllers
+
+The following additional Spring MVC controllers exist in the `v2/controllist` package. They follow the same authentication and response conventions described on this page.
+
+| Controller | Tag / purpose |
+|---|---|
+| `ARControlLists` | Annual report reference lists |
+| `CrossCGIARCollaborations` | Cross-CGIAR collaboration records |
+| `ExpectedStudies` | Outcome/Impact Case Reports (OICRs) |
+| `Expenditures` | W1/W2 financial expenditure data |
+| `GeneralLists` | Shared reference lists (countries, regions, etc.) |
+| `ImpactPathway` | Impact pathway and outcome data |
+| `KeyExternalPartnership` | Key external partnership entries |
+| `ParticipantsCapDev` | Capacity development participant records |
+| `Policies` | Policy research output records |
+| `ProgressTowards` | SRF progress-towards-target records |
+| `ProjectPage` | Aggregated project page data |
+| `QAToken` | Token issuance endpoint |
+| `RelevantEvaluations` | Relevant evaluation actions |
+| `SrfLists` | SRF reference lists (IDOs, Sub-IDOs, SLOs) |
+| `StatusPlannedOutcomes` | Planned outcome status records |
+| `SubmissionToolsControlLists` | Submission tool reference data |
+
+## Pagination, filtering, and phase selection
+
+Most list endpoints require two query parameters that act as mandatory filters:
+
+| Parameter | Type | Description |
+|---|---|---|
+| `year` | `integer` | The reporting year (e.g., `2023`) |
+| `phase` | `string` | The reporting phase name. Valid values are `AR` (Annual Report) and `POWB` (Plan of Work and Budget) |
+
+There is no offset/limit pagination on list endpoints; all matching records for the given entity, year, and phase are returned in a single response array.

@@ -1,0 +1,79 @@
+---
+title: "Querying MARLO projects and clusters via REST API"
+description: "Reference for the MARLO projects REST endpoint — retrieve a project record by ID within a CGIAR entity, with response schema and curl example."
+---
+
+MARLO projects are the primary containers for research activities, budgets, partnerships, and outputs within a CGIAR program. The projects REST controller exposes a single read endpoint that returns a project record by its numeric ID, scoped to a CGIAR entity.
+
+<Note>
+The `Projects` controller is marked `@ApiIgnore` in the source, which means it is excluded from the auto-generated Swagger UI. The endpoint is fully functional, but it does not appear in the interactive Swagger documentation at `/swagger-ui/`.
+</Note>
+
+All endpoints require a valid QA token. See [Authentication](/api/authentication) for details.
+
+---
+
+## Get a project by ID
+
+Retrieve a project record by its numeric ID within a CGIAR entity.
+
+```
+GET /api/v2/controllist/{CGIAREntity}/project/{id}
+```
+
+Requires `FULL_READ_REST_API_PERMISSION`.
+
+### Path parameters
+
+<ParamField path="CGIAREntity" type="string" required>
+  Acronym of the CGIAR program, platform, or center (e.g., `CCAFS`, `HarvestPlus`).
+</ParamField>
+
+<ParamField path="id" type="number" required>
+  Numeric MARLO project ID.
+</ParamField>
+
+### Response
+
+Returns a `ProjectDTO` object.
+
+<ResponseField name="id" type="number">
+  Internal MARLO project ID.
+</ResponseField>
+
+**Example:**
+
+```bash
+curl --request GET \
+  --url 'https://your-marlo-host/api/v2/controllist/CCAFS/project/8432' \
+  --header 'Authorization: Bearer <your-token>'
+```
+
+**Example response:**
+
+```json
+{
+  "id": 8432
+}
+```
+
+Returns `404` if no project with the given ID exists within the specified CGIAR entity.
+
+---
+
+## Related project data
+
+The `ProjectPage` controller provides a richer aggregated view of a project, including partners, milestones, deliverables, innovations, policies, outcomes, and activities. That endpoint follows the same base URL pattern and authentication requirements.
+
+For innovation records linked to a specific project, use the `project` field filter available in the [Innovations](/api/innovations) list response — the `project` field returns the project ID, allowing you to correlate innovations with their parent project.
+
+---
+
+## Common error codes
+
+| HTTP status | Meaning |
+|---|---|
+| `200` | Success |
+| `404` | Project not found for the given ID and CGIAR entity |
+| `401` | Missing or expired token |
+| `403` | Token valid but insufficient permissions or wrong program scope |

@@ -1,0 +1,229 @@
+---
+title: "Running MARLO locally: Java, Maven, and MySQL"
+description: "Step-by-step guide to cloning MARLO, configuring local properties, selecting the correct Java version, and starting the embedded Tomcat server."
+---
+
+This page walks you through everything you need to run MARLO on your own machine: installing prerequisites, copying the properties template, choosing the right run script for your branch's Java version, and verifying the build with the mandatory quality gates.
+
+## Prerequisites
+
+| Tool | Required version | Notes |
+|---|---|---|
+| Java (JDK) | **8** (default) or **17** | Java 17 only on branches containing `java17` or `java_17` in the name |
+| Maven | 3.8.x | Used for the multi-module build and for launching the embedded server |
+| MySQL | 8.x | Local instance; shared CIAT test data requires VPN (see below) |
+
+<Warning>
+Connecting to the shared CIAT test environment requires a VPN:
+
+- **Test** (CIAT Palmira): FortiClient VPN
+- **Staging / Production** (AWS): GlobalProtect VPN
+
+Without the appropriate VPN, database connections to shared environments will time out. A local MySQL instance works offline.
+</Warning>
+
+## Setup steps
+
+<Steps>
+
+<Step title="Clone the repository">
+
+```bash
+git clone https://github.com/CCAFS/MARLO.git
+cd MARLO
+```
+
+</Step>
+
+<Step title="Check out the right branch">
+
+New feature work branches from `aiccra-staging`. Check it out before creating your own branch.
+
+```bash
+git checkout aiccra-staging
+```
+
+To work on a feature, branch off here:
+
+```bash
+git checkout -b aiccra-<your-slug>
+```
+
+<Note>
+If you are assigned to a `java17`-named branch (for example `aiccra-staging-java17`), you must use the Java 17 run scripts throughout this guide.
+</Note>
+
+</Step>
+
+<Step title="Create your local properties file">
+
+Credential files are gitignored and must be created locally. Bootstrap from the committed template:
+
+```bash
+cp marlo-web/src/main/resources/config/marlo-test.properties \
+   marlo-web/src/main/resources/config/marlo-dev.properties
+```
+
+Then open `marlo-dev.properties` and fill in your local database host, username, and password — see [Configuring MARLO](/developer/configuration) for the full property reference.
+
+<Warning>
+**Never commit `marlo-dev.properties` or any other credential file.** All `marlo-${profile}.properties` files are listed in the config directory's `.gitignore`. Committing credentials is a hard rule violation.
+</Warning>
+
+</Step>
+
+<Step title="Set the active Spring profile">
+
+The active profile controls which properties file the application loads:
+
+```
+marlo-${spring.profiles.active}.properties
+```
+
+Available profiles: `dev`, `api`, `pro`, `test`. For local development you will almost always use `dev`. The run scripts set this automatically — no manual configuration is needed when you use them.
+
+</Step>
+
+<Step title="Run MARLO">
+
+Choose the script that matches your branch's Java version. The script stops any existing server, cleans the `marlo-web/target` directory, builds the project with `mvn clean install -DskipTests -pl marlo-web -am`, patches the base URL in `marlo-dev.properties`, and then starts the embedded server.
+
+<Tabs>
+
+<Tab title="Java 8 (default branches)">
+
+**What the script does:**
+
+- Kills any process matching `tomcat7:run`
+- Detects or uses `JAVA_HOME` pointing to JDK 8
+- Builds with Maven
+- Calls `scripts/update-marlo-dev-java8.sh` to rewrite base URLs to `https://localhost:8443`
+- Starts Tomcat via `mvn -pl marlo-web tomcat7:run -P java8`
+
+<CodeGroup>
+
+```bash macOS / Linux
+./scripts/run-marlo-java8.sh
+```
+
+```batch Windows
+scripts\run-marlo-java8.bat
+```
+
+</CodeGroup>
+
+The app is available at:
+- **HTTPS:** `https://localhost:8443/marlo-web/`
+- **HTTP:** `http://localhost:8080/marlo-web/`
+
+If JDK 8 is installed but not the default, set `JAVA_HOME` first:
+
+```bash
+# macOS (Homebrew)
+export JAVA_HOME=$(/usr/libexec/java_home -v 1.8)
+./scripts/run-marlo-java8.sh
+
+# Linux
+export JAVA_HOME=/usr/lib/jvm/java-8-openjdk
+./scripts/run-marlo-java8.sh
+```
+
+```batch
+REM Windows
+set JAVA_HOME=C:\Program Files\Java\jdk1.8.0_xxx
+scripts\run-marlo-java8.bat
+```
+
+</Tab>
+
+<Tab title="Java 17 (java17 branches)">
+
+**What the script does:**
+
+- Kills any process matching `cargo:run`
+- Detects or uses `JAVA_HOME` pointing to JDK 17
+- Builds with Maven
+- Calls `scripts/update-marlo-dev-java17.sh` to rewrite base URLs to `http://localhost:8080`
+- Starts Tomcat via `mvn -pl marlo-web cargo:run`
+
+<CodeGroup>
+
+```bash macOS / Linux
+./scripts/run-marlo-java17.sh
+```
+
+```batch Windows
+scripts\run-marlo-java17.bat
+```
+
+</CodeGroup>
+
+The app is available at:
+- **HTTP:** `http://localhost:8080/marlo-web/`
+
+If JDK 17 is installed but not the default, set `JAVA_HOME` first:
+
+```bash
+# macOS (Homebrew)
+export JAVA_HOME=$(/usr/libexec/java_home -v 17)
+./scripts/run-marlo-java17.sh
+
+# Linux
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
+./scripts/run-marlo-java17.sh
+```
+
+```batch
+REM Windows
+set JAVA_HOME=C:\Program Files\Java\jdk-17
+scripts\run-marlo-java17.bat
+```
+
+</Tab>
+
+</Tabs>
+
+</Step>
+
+<Step title="Verify startup">
+
+The script opens the browser automatically once the server responds. You can also watch the Maven output for Flyway migration logs and Tomcat startup messages.
+
+Flyway applies all pending SQL migrations from `marlo-web/src/main/resources/database/migrations/` automatically on every startup — you do not need to run migrations manually.
+
+</Step>
+
+</Steps>
+
+## Quality gates
+
+Run these before committing or opening a PR. Both are mandatory.
+
+```bash
+# Code style check — must pass before commit
+mvn checkstyle:check
+
+# Unit tests
+mvn test
+```
+
+Checkstyle is configured at `configuration/marlo-checkstyle.xml` and enforces a 120-character line limit, 2-space indentation, and mandatory braces. SonarCloud and Snyk run automatically on push via GitHub Actions and do not need to be run locally.
+
+## About the `update-marlo-dev-*` scripts
+
+The run scripts call a helper that patches `marlo-dev.properties` to use the correct base URL for the current Java version:
+
+| Java version | Scheme | Port | Script called |
+|---|---|---|---|
+| Java 8 | HTTPS | 8443 | `scripts/update-marlo-dev-java8.sh` (or `.bat`) |
+| Java 17 | HTTP | 8080 | `scripts/update-marlo-dev-java17.sh` (or `.bat`) |
+
+If you switch branches between Java 8 and Java 17 variants, re-run the appropriate script (or just run the full `run-marlo-*.sh` again) so the base URL stays in sync.
+
+<Tip>
+You can pass a custom properties file path to the update scripts:
+
+```bash
+./scripts/update-marlo-dev-java17.sh /path/to/custom/marlo-dev.properties
+```
+</Tip>

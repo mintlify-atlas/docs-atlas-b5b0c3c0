@@ -1,0 +1,167 @@
+---
+title: "The MARLO save pipeline: validate, save, replicate"
+description: "How MARLO's mandatory save pipeline works: interceptors gate access, validate() checks fields, the Manager persists data and replicates across phases."
+---
+
+Every write operation in MARLO — from a project description to a funding source — passes through the same mandatory pipeline before a single byte reaches the database. Understanding this pipeline is the prerequisite for adding or modifying any save path in the codebase.
+
+## Why the pipeline is mandatory
+
+MARLO is a multi-tenant, phase-aware system. User context, CRP session, and edit rights vary by request, and the same form can reach different phase chains depending on whether the active cycle is PLANNING or REPORTING. A deviation from the pipeline — such as calling `save()` logic without running the interceptor stack, or skipping the `if (save)` guard on `validate()` — bypasses access control checks and breaks phase replication integrity. The pipeline is a constitutional rule, not a style preference.
+
+## Pipeline overview
+
+```
+HTTP request
+  → Struts mapping (struts-*.xml)
+  → Interceptor stack (auth, session, CRP validation, edit rights)
+  → Action.prepare()
+  → Action.validate()  ← guarded with if (save) { validator.validate(...) }
+  → Action.save()      ← only reached if !hasErrors()
+  → Manager save chain (persist + replicate forward through phases)
+  → Audit listeners (record change automatically)
+```
+
+<Steps>
+
+<Step title="Struts maps the request to an action">
+Every `.do` URL is matched in a `struts-*.xml` file. The mapping declares the action class and, critically, the interceptor stack. For example, the project description form is declared in `marlo-web/src/main/resources/struts-projects.xml`:
+
+```xml
+<action name="{crp}/description"
+    class="org.cgiar.ccafs.marlo.action.projects.ProjectDescriptionAction">
+  <interceptor-ref name="editProjectsStack" />
+  <result name="input">/WEB-INF/crp/views/projects/projectDescription.ftl</result>
+  <result name="success" type="redirectAction">
+    <param name="actionName">${crpSession}/description</param>
+    <param name="edit">true</param>
+    <param name="phaseID">${phaseID}</param>
+    <param name="projectID">${projectID}</param>
+  </result>
+</action>
+```
+
+The `{crp}` segment in the action name is a regex wildcard. MARLO uses `struts.patternMatcher = regex` so every action URL is namespaced to the active CRP or platform.
+</Step>
+
+<Step title="The interceptor stack runs before any action code">
+The stack declared on the action executes before `prepare()`, `validate()`, or `save()` is called. `editProjectsStack` is defined in `marlo-web/src/main/resources/struts.xml`:
+
+```xml
+<interceptor-stack name="editProjectsStack">
+  <interceptor-ref name="i18nFile" />
+  <interceptor-ref name="validCrp" />
+  <interceptor-ref name="requireUser" />
+  <interceptor-ref name="validSessionCrp" />
+  <interceptor-ref name="canEditProject" />
+  <interceptor-ref name="keepRedirectMessages" />
+  <interceptor-ref name="accessibleStage" />
+  <interceptor-ref name="trimInputs" />
+  <interceptor-ref name="defaultStack" />
+</interceptor-stack>
+```
+
+Each interceptor either passes the request on or short-circuits with a redirect:
+
+- `validCrp` — validates the CRP slug in the URL is a known global unit.
+- `requireUser` — redirects unauthenticated requests to the login page.
+- `validSessionCrp` — verifies the user's session is bound to this CRP.
+- `canEditProject` (`EditProjectInterceptor`) — checks that the current user has write access to this specific project in this phase.
+- `accessibleStage` — ensures the section is open for edits in the current cycle.
+
+If any interceptor denies access, the pipeline stops. The action class is never instantiated for that request.
+</Step>
+
+<Step title="Action.prepare() loads domain data">
+After the interceptor stack completes, Struts calls `prepare()` (because `BaseAction` implements `Preparable`). This is where the action loads the entity from the database and populates list data for the template. The `save` flag is already present in the request parameters at this point.
+</Step>
+
+<Step title="Action.validate() guards field-level errors">
+Struts calls `validate()` before executing the result method. Every action in MARLO wraps its validator call in an `if (save)` guard. From `ProjectDescriptionAction` at `marlo-web/src/main/java/org/cgiar/ccafs/marlo/action/projects/ProjectDescriptionAction.java:1307`:
+
+```java
+@Override
+public void validate() {
+  this.setInvalidFields(new HashMap<>());
+  // if is saving call the validator to check for the missing fields
+  if (save) {
+    validator.validate(this, project, true);
+  }
+}
+```
+
+Without the `if (save)` guard, validation would run on every GET request — including history views and cancel operations — and incorrectly surface field errors for read-only renders.
+
+The `validator.validate(this, project, true)` call (where `this` is the action, `project` is the bound entity, and `true` signals a save context) inspects required fields and business rules. When a rule fails, the validator calls `this.addFieldError(fieldName, message)` or populates the invalid-fields map on `BaseAction`.
+</Step>
+
+<Step title="Action.save() persists if no errors were raised">
+Struts only invokes the result method — `save()`, named `execute()` in `ActionSupport` terms but declared as `save()` in MARLO's convention — when `!hasErrors()`. The method starts with a permission check that mirrors the interceptor-level check:
+
+```java
+public String save() {
+  if (this.hasPermission("canEdit")) {
+    // ... normalize checkbox nulls, reconcile collection diffs ...
+
+    projectManager.saveProject(project);
+    // ... save related collections (flagships, clusters, scope) ...
+
+    this.addActionMessage(this.getText("saving.saved"));
+    return SUCCESS;
+  }
+  return NOT_AUTHORIZED;
+}
+```
+
+The action first diffs what the form submitted against what was in the database (in `prepare()`), then delegates each piece to its Manager.
+</Step>
+
+<Step title="Manager save chain persists and replicates forward">
+Each Manager implementation persists the entity and then replicates it through future phases. This is automatic — the action does not drive replication, it only calls the Manager once. See [Phase replication contract in MARLO ManagerImpl](/developer/phase-replication) for the full replication logic.
+</Step>
+
+<Step title="Audit listeners record the change automatically">
+`HibernateAuditLogListener` and `AuditColumnHibernateListener` in `marlo-data` capture inserts and updates on entities that implement `IAuditLog`. The action does not need to write audit records explicitly; they are committed as part of the same Hibernate session that persists the entity.
+</Step>
+
+</Steps>
+
+## The validate() guard in detail
+
+The `if (save)` pattern is consistent across all critical sections. The table below shows verified examples from the codebase:
+
+| Action class | validate() guard | Validator called |
+|---|---|---|
+| `ProjectDescriptionAction` | `if (save)` | `validator.validate(this, project, true)` |
+| `ProjectPartnerAction` | `if (save)` | `projectPartnersValidator.validate(this, project, true)` |
+| `DeliverableAction` | `if (save)` | `deliverableValidator.validate(this, deliverable, true)` |
+| `FundingSourceAction` | `if (save)` | `validator.validate(this, fundingSource, true)` |
+| `FinancialPlanAction` | `if (save)` | `validator.validate(this, powbSynthesis, true)` |
+| `OutcomesAction` | `if (save)` | `validator.validate(this, outcomes, selectedProgram, true)` |
+| `MeliaAction` | `if (save)` | `validator.validate(this, reportSynthesis, true)` |
+
+The `save` boolean is set by Struts when the form POSTs with a `save=true` request parameter. The hidden input that triggers it is rendered by the shared save-button partial in the FreeMarker templates.
+
+## Debugging save failures
+
+When a save does not persist as expected, work through the pipeline from the outside in:
+
+1. **Confirm the action mapping** — check the relevant `struts-*.xml` for the action name and the stack it declares.
+2. **Check interceptor denial** — if the page redirected to a 403 or login, the interceptor stack blocked the request before any action code ran.
+3. **Verify `save=true` is in the POST** — if the request did not include `save=true`, `validate()` ran with the guard off and `hasErrors()` may return false incorrectly.
+4. **Inspect validator output** — after a POST, the template renders `[@s.fielderror]` tags for each field that the validator populated. Missing errors often mean the validator was not called.
+5. **Check `hasPermission("canEdit")`** — the save method itself re-checks edit rights; a permission gap here returns `NOT_AUTHORIZED` silently if the template does not surface it.
+
+<Warning>
+Do not call manager save methods directly from a new action without going through the full interceptor stack and the `if (save)` validator guard. Bypassing the stack removes all CRP-scoping and edit-rights checks. Bypassing the guard runs persistence on GET requests and breaks autosave state. Both deviations are constitutional violations.
+</Warning>
+
+## Adding a new save path
+
+When you introduce a new Struts `.do` action that writes data:
+
+1. Declare the action in the appropriate `struts-<area>.xml` with an interceptor stack that matches the access level of the section (`editProjectsStack`, `crpAdminStack`, `impactPathwayStack`, etc.).
+2. Extend `BaseAction` and implement `Preparable`.
+3. Implement `validate()` with the `if (save) { ... }` guard calling a new or existing `Validator` class under `marlo-web/.../validation/`.
+4. Implement `save()` gated on `this.hasPermission("canEdit")`, delegating persistence to the Manager layer.
+5. Ensure the Manager follows the phase replication contract (see [Phase replication contract in MARLO ManagerImpl](/developer/phase-replication)).

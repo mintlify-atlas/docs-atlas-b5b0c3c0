@@ -1,0 +1,68 @@
+---
+title: "Using MARLO's AI Reports Generator for donor output"
+description: "Generate AI-assisted narrative draft sections from MARLO's structured phase data, then review and finalize them for donor report submission."
+---
+
+MARLO's AI Reports Generator takes the structured data your program has entered — deliverables, innovations, OICRs, and QA-validated results — and produces draft narrative sections that PMU leads can review, edit, and incorporate into formal donor reports. It replaces the time-consuming work of manually synthesizing hundreds of records into coherent prose, while keeping a human reviewer accountable for every sentence that goes to donors.
+
+## What the Reports Generator does
+
+The Reports Generator reads structured records from the current phase and selected clusters, then uses AWS Bedrock to produce narrative drafts for each section of the annual donor report. It is not a general-purpose writing assistant — it generates text that is directly traceable back to specific MARLO entries, which means every factual claim in the draft can be verified against the platform's records.
+
+Key capabilities:
+
+- Synthesizes deliverables, innovations, and OICRs across all selected clusters into section-level narratives
+- Incorporates QA results to reflect quality status in the narrative
+- Uses Amazon OpenSearch vector retrieval to find the most relevant records for each report section
+- Produces output formatted for donor report sections (background, results, outputs, lessons learned)
+
+## How it works: step by step
+
+<Steps>
+  <Step title="Open the AI section">
+    Log in to MARLO, confirm the correct Global Unit is active in the header, and navigate to **AI** in the main menu. The AI landing page at `/ai/{crp}/` shows the tools configured for your program, including the Reports Generator.
+  </Step>
+  <Step title="Select phase and clusters">
+    Choose the reporting phase (typically the Annual Report phase for the current year) and the clusters you want to include. You can generate a report for a single cluster, a subset, or the full program.
+  </Step>
+  <Step title="Trigger generation">
+    Click to start generation. MARLO's backend invokes an AWS Lambda function that retrieves your phase's records through the REST API, embeds the key content using Amazon Titan, and queries the OpenSearch vector index to surface the most relevant material for each report section.
+  </Step>
+  <Step title="Review the draft">
+    The draft narrative appears in the MARLO UI, organized by report section. Each section is linked to the source records it draws from. Read the draft carefully — check factual accuracy against the underlying MARLO entries and verify that quality and open-access figures match the current BI dashboard values.
+  </Step>
+  <Step title="Edit and finalize">
+    Edit the draft directly in MARLO or export it for editing in your document tool of choice. The Reports Generator output is a starting point, not a final product. PMU leads are responsible for the accuracy, tone, and completeness of any section submitted to donors.
+  </Step>
+  <Step title="Incorporate into the annual report">
+    Once reviewed and approved internally, copy the finalized sections into the program's annual report document. The MARLO BI dashboards (Results and QA) remain the authoritative quantitative reference alongside the narrative.
+  </Step>
+</Steps>
+
+## Quality targets it supports
+
+The Reports Generator is designed to help programs consistently reach their reporting quality targets:
+
+- **92%+ quality rating** — by grounding narratives in QA-validated records, the generator surfaces only deliverables and innovations that have passed the quality review threshold
+- **95%+ open-access compliance** — the generator can flag or include open-access status for every deliverable mentioned, helping PMU verify compliance claims before submission
+
+These targets reflect the baseline established by AICCRA across its 2021–2025 reporting cycles and are the measurable benchmarks MARLO's AI services are built to support.
+
+## Integration with Power BI
+
+The Reports Generator and Power BI dashboards serve complementary purposes:
+
+| Tool | What it produces | Primary audience |
+|---|---|---|
+| **Reports Generator** | Narrative prose: what was achieved, how, and with what effect | Donor reports, annual report documents |
+| **Power BI dashboards** | Quantitative visualization: counts, rates, trends | PMU oversight, QA monitoring, public transparency |
+
+Use the [Results dashboard](/analytics/power-bi) to validate the numbers your narrative cites, and use the [Completeness dashboard](/analytics/power-bi#completeness-view-for-pmu-oversight) to confirm all clusters have submitted data before generating the program-level report.
+
+<Note>
+Reports Generator output is always a **draft**. The generated narrative has not been reviewed for accuracy, donor-appropriate tone, or compliance with your program's reporting framework. It is a productivity aid for PMU leads, not a finished document.
+</Note>
+
+<Warning>
+Do not submit AI-generated content to donors without a full human review. MARLO's governance model requires that a PMU lead reads, edits, and approves every section before it leaves the platform. Submitting unreviewed AI output exposes the program to factual errors and may not meet donor reporting standards.
+</Warning>

@@ -1,0 +1,126 @@
+---
+title: "Understanding MARLO user roles and access control"
+description: "A guide to MARLO's role hierarchy, what each role can do, how roles are scoped to programs and clusters, and best practices for assignment."
+---
+
+MARLO controls access through a layered role system that mirrors how research programs are organized. Roles determine what a user can read, edit, or approve — and whether those permissions apply platform-wide, within a specific program, or within a specific cluster. This page explains each role, how scope works, and how to assign roles through the Admin panel.
+
+## Role hierarchy
+
+MARLO defines seven roles in descending order of authority:
+
+1. **Super Admin** — system-wide
+2. **Admin** — program-wide
+3. **PMU** (Program Management Unit) — program-wide
+4. **Project / Cluster Leader** — cluster-scoped
+5. **Cluster Coordinator** — cluster-scoped
+6. **QA Reviewer** — phase-scoped
+7. **Guest User** — restricted
+
+<Note>
+Super Admin is the only role that is not scoped to a program or cluster. Super Admins can configure Global Units, manage system-wide parameters, and onboard new programs. This role should be assigned sparingly — typically only to the IBD platform team.
+</Note>
+
+## Permissions matrix
+
+The table below summarizes what each role can do across the major areas of the platform.
+
+| Capability | Super Admin | Admin | PMU | Cluster Leader | Cluster Coordinator | QA Reviewer | Guest |
+|---|---|---|---|---|---|---|---|
+| Onboard new Global Unit | ✅ | — | — | — | — | — | — |
+| Manage system-wide parameters | ✅ | — | — | — | — | — | — |
+| Configure phases for a program | ✅ | ✅ | — | — | — | — | — |
+| Manage users and roles | ✅ | ✅ | — | — | — | — | — |
+| Configure partners and locations | ✅ | ✅ | — | — | — | — | — |
+| Enable / disable specificities | ✅ | ✅ | — | — | — | — | — |
+| View cross-cluster completeness | ✅ | ✅ | ✅ | — | — | — | — |
+| Edit POWB synthesis (program-level) | ✅ | ✅ | ✅ | — | — | — | — |
+| Edit Annual Report synthesis | ✅ | ✅ | ✅ | — | — | — | — |
+| Manage Impact Pathway structure | ✅ | ✅ | ✅ | ✅ | — | — | — |
+| Enter and edit cluster-level data | ✅ | ✅ | ✅ | ✅ | ✅ | — | — |
+| Submit cluster plan / report | ✅ | ✅ | ✅ | ✅ | ✅ | — | — |
+| Provide QA feedback | ✅ | ✅ | ✅ | — | — | ✅ | — |
+| Mark items validated | ✅ | ✅ | ✅ | — | — | ✅ | — |
+| Read-only access to assigned areas | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+## How role scope works
+
+MARLO enforces three scope levels:
+
+**System-wide** — The Super Admin role has no program boundary. A Super Admin can see and configure every Global Unit on the platform.
+
+**Program-wide** — Admin, PMU, and QA Reviewer roles are granted per Global Unit (CRP, Platform, or Center). A user with Admin rights on AICCRA has no special access on another program running on the same instance.
+
+**Cluster-scoped** — Cluster Leader and Cluster Coordinator roles are tied to a specific cluster within a program. Cluster scope is established through partner institutions: when a user is linked to a partner institution that manages a cluster, their permissions apply only within that cluster's data.
+
+<Tip>
+A single user can hold different roles across different programs. For example, someone might be a Cluster Coordinator on AICCRA and a QA Reviewer on a separate Platform running on the same MARLO instance.
+</Tip>
+
+## Role descriptions
+
+<AccordionGroup>
+  <Accordion title="Super Admin">
+    Manages the platform at the system level. Responsibilities include registering new Global Units (CRPs, Platforms, Centers), configuring system-wide parameters, managing all users across all programs, and overseeing platform health. This role is typically held by the IBD team only.
+  </Accordion>
+  <Accordion title="Admin">
+    Manages a single program. Responsibilities include configuring phases and planning cycles, assigning roles to users within the program, managing partner institutions and locations, and enabling or disabling feature flags (specificities) for the program.
+  </Accordion>
+  <Accordion title="PMU (Program Management Unit)">
+    Oversees compliance and synthesis across all clusters in a program. PMU users can view completeness dashboards, edit program-level synthesis sections (POWB, Annual Report), and generate donor-ready reports. They do not edit cluster-level data directly.
+  </Accordion>
+  <Accordion title="Cluster / Project Leader">
+    Provides strategic oversight for a specific cluster. Cluster Leaders can review and sign off on cluster narratives and KPIs, and edit cluster-level planning data alongside the Coordinator. Their access is limited to their assigned cluster.
+  </Accordion>
+  <Accordion title="Cluster / Project Coordinator">
+    The primary data entry role. Cluster Coordinators enter planning data, register deliverables, innovations, and OICRs, and respond to QA feedback. Their access is limited to their assigned cluster.
+  </Accordion>
+  <Accordion title="QA Reviewer">
+    Reviews submissions during an active phase. QA Reviewers can open any cluster's entries in their assigned program, add structured field-level feedback, and mark items as validated or needing revision. They cannot edit the underlying data.
+  </Accordion>
+  <Accordion title="Guest User">
+    Has restricted, read-only access to areas explicitly granted by an Admin. Guest access is intended for controlled external collaboration (e.g., partner organizations that need to review specific content without editing it).
+  </Accordion>
+</AccordionGroup>
+
+## Assigning roles
+
+Roles are managed from **Admin → Users Management** within a program.
+
+<Steps>
+  <Step title="Open user management">
+    Navigate to **Admin** in the top menu, then select **Users Management**. The URL follows the pattern `/admin/{crp}/usersManagement.do`.
+  </Step>
+  <Step title="Search or add a user">
+    Search for an existing user by name or email. If the user does not yet have an account, they must first authenticate against CGIAR Active Directory or be registered as an internal user.
+  </Step>
+  <Step title="Assign a role">
+    Select the role from the role selector. For cluster-scoped roles (Cluster Leader, Coordinator), you must also choose the specific cluster (project) the role applies to.
+  </Step>
+  <Step title="Link to a partner institution (cluster-scoped roles)">
+    For Cluster Leader and Cluster Coordinator assignments, confirm that the user is linked to the partner institution that owns the cluster. This is what establishes the cluster boundary in the authorization layer.
+  </Step>
+  <Step title="Save">
+    Save the changes. The new role takes effect on the user's next page load.
+  </Step>
+</Steps>
+
+## Understanding partner institution access
+
+Cluster scope in MARLO is not just a label — it is enforced through the relationship between a user, their role, and the partner institution associated with a cluster.
+
+When a Cluster Coordinator or Leader is assigned to a cluster:
+
+- They are linked to the partner institution that manages that cluster.
+- The platform's authorization interceptors verify this link on every request to a cluster-level section.
+- If the link is removed (e.g., the user changes institutions), access to that cluster is revoked automatically.
+
+This means that partner institution assignments and role assignments must be kept in sync. Review both when onboarding a new team member or when a team member moves between clusters.
+
+## Best practices
+
+- **Assign the minimum role needed.** Most field researchers only need Cluster Coordinator access. Avoid granting PMU or Admin access unless the person's responsibilities genuinely require cross-cluster visibility or configuration rights.
+- **Review roles at the start of each annual cycle.** Staff turnover and team restructuring are common between cycles. A role audit before the POWB phase opens prevents stale permissions from blocking or enabling the wrong people.
+- **Use Guest access for external reviewers.** If a donor or partner organization needs to review content without editing it, Guest is the appropriate role — not Cluster Coordinator.
+- **Never share accounts.** MARLO's audit log ties every change to a specific user. Shared accounts undermine traceability and make QA feedback attribution unreliable.
+- **Contact the IBD team for Super Admin actions.** If your program needs a new phase configured, a new Global Unit registered, or a system parameter changed, submit a request to `Marlosupport@cgiar.org` rather than attempting to elevate your own role.

@@ -1,0 +1,373 @@
+---
+title: "Querying innovations and scaling readiness via API"
+description: "Reference for MARLO's innovations REST endpoints — list, create, update, and delete CRP innovation records with Scaling Readiness scores and Sub-IDO linkages."
+---
+
+MARLO tracks research innovations in the "Table 4 - CRP Innovations" reporting section. An innovation record captures the stage of scaling reached, the organisations involved, geographic coverage, contributing milestones, and CGIAR Sub-IDO linkages. The innovations API exposes four endpoints for full CRUD access scoped to a CGIAR entity and reporting phase.
+
+All endpoints require a valid QA token. See [Authentication](/api/authentication) for details.
+
+---
+
+## List all innovations
+
+Retrieve all innovations for a CGIAR entity within a reporting year and phase.
+
+```
+GET /api/v2/controllist/{CGIAREntity}/innovations
+```
+
+### Path parameters
+
+<ParamField path="CGIAREntity" type="string" required>
+  Acronym of the CGIAR program, platform, or center (e.g., `CCAFS`).
+</ParamField>
+
+### Query parameters
+
+<ParamField query="year" type="integer" required>
+  Reporting year (e.g., `2023`).
+</ParamField>
+
+<ParamField query="phase" type="string" required>
+  Reporting phase: `AR` (Annual Report) or `POWB` (Plan of Work and Budget).
+</ParamField>
+
+### Response
+
+Returns a JSON array of `ProjectInnovationARDTO` objects — a flattened summary representation used for Annual Report exports.
+
+<ResponseField name="id" type="number">
+  Internal MARLO innovation ID.
+</ResponseField>
+<ResponseField name="title" type="string">
+  Name of the innovation.
+</ResponseField>
+<ResponseField name="project" type="number">
+  ID of the associated MARLO project.
+</ResponseField>
+<ResponseField name="year" type="number">
+  Reporting year.
+</ResponseField>
+<ResponseField name="narrative" type="string">
+  Description of the innovation.
+</ResponseField>
+<ResponseField name="stageOfInnovation" type="object">
+  <Expandable title="StageOfInnovationDTO fields">
+    <ResponseField name="id" type="number">Stage identifier.</ResponseField>
+    <ResponseField name="name" type="string">Stage name (e.g., "Scaling Readiness Assessment").</ResponseField>
+  </Expandable>
+</ResponseField>
+<ResponseField name="descriptionStage" type="string">
+  Description of the stage reached.
+</ResponseField>
+<ResponseField name="innovationType" type="object">
+  <Expandable title="InnovationTypeDTO fields">
+    <ResponseField name="id" type="number">Innovation type identifier.</ResponseField>
+    <ResponseField name="name" type="string">Type name.</ResponseField>
+  </Expandable>
+</ResponseField>
+<ResponseField name="innovationNumber" type="number">
+  Count of individual improved lines/varieties (where applicable).
+</ResponseField>
+<ResponseField name="otherInnovationType" type="string">
+  Free-text description when innovation type is "Other".
+</ResponseField>
+<ResponseField name="nextUserOrganizationTypes" type="object[]">
+  List of organisation types that are the next users of this innovation.
+</ResponseField>
+<ResponseField name="geographicScopes" type="object[]">
+  List of geographic scope objects (global, regional, national, etc.).
+</ResponseField>
+<ResponseField name="regions" type="object[]">
+  List of region objects applicable when scope includes regional coverage.
+</ResponseField>
+<ResponseField name="countries" type="object[]">
+  List of country objects applicable when scope includes national coverage.
+</ResponseField>
+<ResponseField name="equitativeEffort" type="boolean">
+  Whether this is an equitable effort across partners.
+</ResponseField>
+<ResponseField name="leadOrganization" type="object">
+  The lead organisation driving this stage of the innovation.
+</ResponseField>
+<ResponseField name="contributingInstitutions" type="object[]">
+  Up to five contributing organisations.
+</ResponseField>
+<ResponseField name="evidenceLink" type="string">
+  URL to supporting evidence.
+</ResponseField>
+<ResponseField name="contributingCGIAREntities" type="object[]">
+  Contributing CRPs or platforms.
+</ResponseField>
+<ResponseField name="milestonesList" type="object[]">
+  Associated contributing milestones.
+</ResponseField>
+<ResponseField name="srfSubIdoList" type="object[]">
+  Linked CGIAR Sub-IDOs from the SRF framework.
+</ResponseField>
+<ResponseField name="projectExpetedStudyList" type="object[]">
+  Linked Outcome/Impact Case Reports (OICRs).
+</ResponseField>
+
+**Example:**
+
+```bash
+curl --request GET \
+  --url 'https://your-marlo-host/api/v2/controllist/CCAFS/innovations?year=2023&phase=AR' \
+  --header 'Authorization: Bearer <your-token>'
+```
+
+---
+
+## Get an innovation by ID
+
+Retrieve a single innovation with full detail.
+
+```
+GET /api/v2/controllist/{CGIAREntity}/innovations/{id}
+```
+
+### Path parameters
+
+<ParamField path="CGIAREntity" type="string" required>
+  CGIAR entity acronym.
+</ParamField>
+
+<ParamField path="id" type="number" required>
+  MARLO innovation ID.
+</ParamField>
+
+### Query parameters
+
+<ParamField query="year" type="integer" required>
+  Reporting year.
+</ParamField>
+
+<ParamField query="phase" type="string" required>
+  Reporting phase (`AR` or `POWB`).
+</ParamField>
+
+**Example:**
+
+```bash
+curl --request GET \
+  --url 'https://your-marlo-host/api/v2/controllist/CCAFS/innovations/512?year=2023&phase=AR' \
+  --header 'Authorization: Bearer <your-token>'
+```
+
+Returns a full `InnovationDTO` object (same fields as the list response plus a nested `project` object with an `id` field). Returns `404` if not found.
+
+---
+
+## Create an innovation
+
+Create a new innovation record.
+
+```
+POST /api/v2/controllist/{CGIAREntity}/innovations
+```
+
+Requires `FULL_CREATE_REST_API_PERMISSION`.
+
+### Path parameters
+
+<ParamField path="CGIAREntity" type="string" required>
+  CGIAR entity acronym.
+</ParamField>
+
+### Request body (`NewInnovationDTO`)
+
+<ParamField body="title" type="string" required>
+  Name of the innovation.
+</ParamField>
+<ParamField body="narrative" type="string">
+  Description of the innovation.
+</ParamField>
+<ParamField body="project" type="object">
+  Project reference object. Provide `{ "id": <project-id> }`.
+</ParamField>
+<ParamField body="stageOfInnovation" type="object">
+  Stage of innovation reference. Provide `{ "id": <stage-id> }`.
+</ParamField>
+<ParamField body="descriptionStage" type="string">
+  Description of the stage reached.
+</ParamField>
+<ParamField body="innovationType" type="object">
+  Innovation type reference. Provide `{ "id": <type-id> }`.
+</ParamField>
+<ParamField body="innovationNumber" type="number">
+  Count of improved lines/varieties (where applicable).
+</ParamField>
+<ParamField body="otherInnovationType" type="string">
+  Free-text description when innovation type is "Other".
+</ParamField>
+<ParamField body="nextUserOrganizationTypes" type="object[]">
+  List of organisation type references.
+</ParamField>
+<ParamField body="geographicScopes" type="object[]">
+  List of geographic scope references.
+</ParamField>
+<ParamField body="regions" type="object[]">
+  List of region code references.
+</ParamField>
+<ParamField body="countries" type="object[]">
+  List of country code references.
+</ParamField>
+<ParamField body="equitativeEffort" type="boolean">
+  Whether effort is equitable across partners.
+</ParamField>
+<ParamField body="leadOrganization" type="object">
+  Lead institution reference. Provide `{ "code": <institution-code> }`.
+</ParamField>
+<ParamField body="contributingInstitutions" type="object[]">
+  List of up to five contributing institution references.
+</ParamField>
+<ParamField body="evidenceLink" type="string">
+  URL to supporting evidence.
+</ParamField>
+<ParamField body="contributingCGIAREntities" type="object[]">
+  List of contributing CRP/platform references.
+</ParamField>
+<ParamField body="milestonesCodeList" type="object[]">
+  List of `NewMilestonesDTO` references linking contributing milestones.
+</ParamField>
+<ParamField body="srfSubIdoList" type="object[]">
+  List of `NewSrfSubIdoDTO` references linking CGIAR Sub-IDOs.
+</ParamField>
+<ParamField body="projectExpectedStudyList" type="string[]">
+  List of OICR identifier strings to link.
+</ParamField>
+<ParamField body="phase" type="object" required>
+  <Expandable title="PhaseDTO fields">
+    <ParamField body="name" type="string" required>Phase name (`AR` or `POWB`).</ParamField>
+    <ParamField body="year" type="integer" required>Phase year.</ParamField>
+  </Expandable>
+</ParamField>
+
+**Example:**
+
+```bash
+curl --request POST \
+  --url 'https://your-marlo-host/api/v2/controllist/CCAFS/innovations' \
+  --header 'Authorization: Bearer <your-token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "title": "Drought-tolerant maize variety DT-WEMA-2023",
+    "narrative": "A drought-tolerant open-pollinated maize variety released for smallholder farmers in East Africa.",
+    "project": { "id": 8432 },
+    "stageOfInnovation": { "id": 3 },
+    "descriptionStage": "Released and adopted by over 50,000 farmers in Kenya and Tanzania.",
+    "innovationType": { "id": 1 },
+    "innovationNumber": 1,
+    "geographicScopes": [{ "id": 4 }],
+    "countries": [{ "isoAlpha2": "KE" }, { "isoAlpha2": "TZ" }],
+    "equitativeEffort": false,
+    "leadOrganization": { "code": 122 },
+    "evidenceLink": "https://hdl.handle.net/10568/example",
+    "phase": { "name": "AR", "year": 2023 }
+  }'
+```
+
+Returns the numeric ID (`Long`) of the newly created innovation.
+
+---
+
+## Update an innovation
+
+Update an existing innovation record.
+
+```
+PUT /api/v2/controllist/{CGIAREntity}/innovations/{id}
+```
+
+Requires `FULL_CREATE_REST_API_PERMISSION`.
+
+### Path parameters
+
+<ParamField path="CGIAREntity" type="string" required>
+  CGIAR entity acronym.
+</ParamField>
+
+<ParamField path="id" type="number" required>
+  MARLO innovation ID to update.
+</ParamField>
+
+### Request body
+
+Same fields as `POST /innovations` (`NewInnovationDTO`). Supply all fields you want to retain.
+
+**Example:**
+
+```bash
+curl --request PUT \
+  --url 'https://your-marlo-host/api/v2/controllist/CCAFS/innovations/512' \
+  --header 'Authorization: Bearer <your-token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "title": "Drought-tolerant maize variety DT-WEMA-2023 (updated)",
+    "narrative": "Updated narrative with additional country coverage.",
+    "stageOfInnovation": { "id": 3 },
+    "innovationType": { "id": 1 },
+    "geographicScopes": [{ "id": 4 }],
+    "countries": [{ "isoAlpha2": "KE" }, { "isoAlpha2": "TZ" }, { "isoAlpha2": "UG" }],
+    "equitativeEffort": false,
+    "phase": { "name": "AR", "year": 2023 }
+  }'
+```
+
+Returns the numeric ID of the updated innovation.
+
+---
+
+## Delete an innovation
+
+Delete an innovation record by ID.
+
+```
+DELETE /api/v2/controllist/{CGIAREntity}/innovations/{id}
+```
+
+Requires `FULL_READ_REST_API_PERMISSION`.
+
+### Path parameters
+
+<ParamField path="CGIAREntity" type="string" required>
+  CGIAR entity acronym.
+</ParamField>
+
+<ParamField path="id" type="number" required>
+  MARLO innovation ID.
+</ParamField>
+
+### Query parameters
+
+<ParamField query="year" type="integer" required>
+  Reporting year.
+</ParamField>
+
+<ParamField query="phase" type="string" required>
+  Reporting phase (`AR` or `POWB`).
+</ParamField>
+
+**Example:**
+
+```bash
+curl --request DELETE \
+  --url 'https://your-marlo-host/api/v2/controllist/CCAFS/innovations/512?year=2023&phase=AR' \
+  --header 'Authorization: Bearer <your-token>'
+```
+
+Returns an `InnovationDTO` object on success. Returns `404` if not found.
+
+---
+
+## Common error codes
+
+| HTTP status | Meaning |
+|---|---|
+| `200` | Success |
+| `404` | Innovation not found for the given ID, entity, year, and phase |
+| `401` | Missing or expired token |
+| `403` | Token valid but insufficient permissions or wrong program scope |
+| `400` | Request body validation failed |

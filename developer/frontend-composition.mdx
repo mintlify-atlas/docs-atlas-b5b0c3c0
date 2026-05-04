@@ -1,0 +1,245 @@
+---
+title: "MARLO FreeMarker templates: layout and composition"
+description: "How MARLO composes FreeMarker pages using #include for layout, #import for macro libraries, and customForm macros from forms.ftl to render form controls."
+---
+
+MARLO's frontend is a server-rendered, pull-based MVC system. The Struts 2 action populates the model, and FreeMarker renders it into HTML. There is no client-side routing, no single-page application framework, and no virtual DOM — the server produces complete HTML pages, and the browser loads them in full. Understanding how the templates are composed is the prerequisite for modifying any screen or adding a new one.
+
+## Three composition mechanisms
+
+FreeMarker composition in MARLO uses three distinct mechanisms, each with a specific role:
+
+1. **`[#include]`** — pulls in layout fragments (header, menu, footer, messages, breadcrumb). The included fragment has access to the surrounding template's variables.
+2. **`[#import ... as alias]`** — loads a macro library and binds it to an alias. The alias is used for all macro calls from that library.
+3. **Macro calls** (`[@alias.macroName ... /]`) — render a reusable UI component with its parameters.
+
+## Standard layout fragments
+
+Every full-page template includes the same set of global layout fragments from `/WEB-INF/global/pages/`. The canonical sequence from `projectDescription.ftl`:
+
+```ftl
+[#ftl]
+[#assign title = "Cluster Description" /]
+[#assign customJS = [
+  "${baseUrlMedia}/js/projects/projectDescription.js?20251009",
+  "${baseUrlCdn}/global/js/autoSave.js?20210616",
+  "${baseUrlCdn}/global/js/fieldsValidation.js"
+] /]
+[#assign customCSS = [
+  "${baseUrlMedia}/css/projects/projectDescription.css?20230106"
+] /]
+
+[#include "/WEB-INF/global/pages/header.ftl" /]
+[#include "/WEB-INF/global/pages/main-menu.ftl" /]
+```
+
+And near the bottom:
+
+```ftl
+[#include "/WEB-INF/global/pages/footer.ftl" /]
+```
+
+The standard fragments and their roles:
+
+| Fragment | Path | Purpose |
+|---|---|---|
+| `header.ftl` | `/WEB-INF/global/pages/header.ftl` | HTML `<head>`, global CSS/JS imports, imports `forms.ftl` as `customForm` |
+| `main-menu.ftl` | `/WEB-INF/global/pages/main-menu.ftl` | Top navigation bar and CRP switcher |
+| `footer.ftl` | `/WEB-INF/global/pages/footer.ftl` | Page footer, closing `<body>` and `</html>` |
+| `breadcrumb.ftl` | `/WEB-INF/global/pages/breadcrumb.ftl` | Breadcrumb trail (rendered from the `breadCrumb` variable set in the page template) |
+| Domain menu | e.g., `/WEB-INF/crp/views/projects/menu-projects.ftl` | Left-hand section navigation for the current domain |
+| Domain messages | e.g., `/WEB-INF/crp/views/projects/messages-projects.ftl` | Section-level save status, validation messages |
+
+## The customForm macro library
+
+`header.ftl` imports `forms.ftl` and binds it to the alias `customForm`:
+
+```ftl
+[#import "/WEB-INF/global/macros/forms.ftl" as customForm /]
+```
+
+Because `header.ftl` is included before the page body, `customForm` is available in every template that includes the standard header. You do not re-import it in individual page templates.
+
+The macro library lives at `marlo-web/src/main/webapp/WEB-INF/global/macros/forms.ftl` and provides:
+
+| Macro | Usage |
+|---|---|
+| `customForm.input` | Single-line text, number, or email input |
+| `customForm.textArea` | Multi-line text area, optionally with rich-text editor |
+| `customForm.select` | Dropdown select bound to a Java collection |
+| `customForm.checkbox` | Single checkbox |
+| `customForm.radioButtonGroup` | Group of radio buttons |
+
+### Using customForm macros
+
+Input names in MARLO mirror the Struts OGNL model path — the same string that Struts uses to bind the form field to the action property. This is how the `customForm.input` call renders the project title field in `projectDescription.ftl`:
+
+```ftl
+[@customForm.textArea
+  name="project.projectInfo.title"
+  i18nkey="project.title"
+  required=true
+  className="project-title limitWords-30"
+  editable=(action.isAdmin() || action.canAccessSuperAdmin())
+/]
+```
+
+Key parameters:
+
+- `name` — the OGNL path. Struts uses this for both reading the current value from the model and binding the submitted value back to the action.
+- `i18nkey` — key in the global or CRP-specific `.properties` file for the field label.
+- `required=true` — renders the required indicator and adds a `required` CSS class for client-side validation.
+- `editable` — when `false`, the macro renders the value as read-only text and a hidden input (the field is still submitted but not editable).
+
+A text input with an optional placeholder and maximum length:
+
+```ftl
+[@customForm.input
+  name="fundingSource.fundingSourceInfo.title"
+  i18nkey="fundingSource.title"
+  required=true
+  editable=editable
+  placeholder="fundingSource.title.placeholder"
+  maxlength="500"
+/]
+```
+
+## Domain-specific macro libraries
+
+Beyond `customForm`, some domains import their own macro libraries for complex repeated components. Examples from the composition map:
+
+### POWB financial plan
+
+```ftl
+[#import "/WEB-INF/crp/views/powb/macros-powb.ftl" as powbMacros /]
+
+[#-- uses both global and domain-specific macros --]
+[@customForm.textArea name="powbSynthesis.financialPlan.financialPlanIssues"
+  editable=editable required=false /]
+
+[@powbMacros.projectBudgetsByFlagshipMacro ... /]
+```
+
+### Home dashboard
+
+```ftl
+[#import "/WEB-INF/crp/macros/projectsListTemplate.ftl" as projectList /]
+[#import "/WEB-INF/global/macros/homeDashboard.ftl" as indicatorLists /]
+
+[@projectList.dashboardProjectsList ... /]
+[@indicatorLists.deliverablesHomeList ... /]
+```
+
+## Template macro pattern for dynamic lists
+
+When a section has a repeatable block — a list of partners, a list of funding sources — the pattern is to define a macro for a single row and render an invisible template instance for JavaScript to clone:
+
+```ftl
+[#-- Reusable row macro --]
+[#macro feedbackCommentFieldsMacro element={} index=0 isTemplate=false]
+  <div class="feedbackCommentItem simpleBox"
+      id="feedbackCommentItem-${isTemplate?string('T', index)}">
+
+    [@customForm.input
+      name="element.comment"
+      i18nkey="feedback.comment"
+      required=true
+      editable=editable
+    /]
+
+    [#-- Remove button --]
+    [#if editable]
+      <div class="removeLink">
+        <a href="javascript:void(0)" class="removeItem">
+          [@s.text name="global.remove" /]
+        </a>
+      </div>
+    [/#if]
+  </div>
+[/#macro]
+
+[#-- Rendered list of existing items --]
+[#list (feedbackComments)![] as comment]
+  [@feedbackCommentFieldsMacro element=comment index=comment?index /]
+[/#list]
+
+[#-- Hidden template instance; JS clones this and removes isTemplate marker --]
+[@feedbackCommentFieldsMacro element={} isTemplate=true /]
+```
+
+The hidden template instance has `isTemplate=true` so it gets the ID suffix `T`. JavaScript (`autoSave.js` and section-specific scripts) clones this node, replaces `T` with the real index, and appends it to the list. This is the mandatory pattern for all dynamic list blocks — do not build ad-hoc DOM construction in JavaScript.
+
+## JavaScript integration
+
+Three JavaScript files are wired into the standard page lifecycle:
+
+| File | Purpose |
+|---|---|
+| `autoSave.js` | Polls for unsaved changes and triggers the save pipeline; manages the save-button state |
+| `fieldsValidation.js` | Client-side pre-flight validation that mirrors the server-side validator rules; prevents obvious invalid submits |
+| `discardChangesPopup.ftl` | FTL partial that renders the discard-changes confirmation modal; included by section-specific templates |
+
+These are included via the `customJS` array at the top of the page template:
+
+```ftl
+[#assign customJS = [
+  "${baseUrlMedia}/js/projects/projectDescription.js?20251009",
+  "${baseUrlCdn}/global/js/autoSave.js?20210616",
+  "${baseUrlCdn}/global/js/fieldsValidation.js"
+] /]
+```
+
+`header.ftl` iterates `customJS` and emits the script tags.
+
+## State model: server state is canonical
+
+The server holds the canonical state. When the browser loads a form, FreeMarker reads the model from the Struts action and populates every field. When the user submits, Struts binds the POST body back to the action model, runs the interceptor stack and validator, and persists via the Manager. The browser has no authoritative copy of the data at any point.
+
+The `autoSave.js` client state — the in-memory representation of what the user typed since the last server save — is transient. It is used only to detect unsaved changes and show the discard-changes prompt. It is discarded on the next full page load.
+
+<Note>
+MARLO has no single-page application, no client-side router, and no AJAX data-binding framework. Every save is a full form POST to a Struts `.do` action. The Post-Redirect-Get pattern means a successful save always reloads the page from a GET. Do not introduce components that assume persistent client-side state across page navigations.
+</Note>
+
+## Specificity-gated content
+
+Sections that depend on a feature flag use `action.hasSpecificities(key)` directly in the FTL:
+
+```ftl
+[#if action.hasSpecificities('crp_has_flagship')]
+  [#-- Flagship selection UI --]
+[/#if]
+```
+
+For hide-on-true behavior:
+
+```ftl
+[#if !action.hasSpecificities('crp_has_flagship')]
+  [#-- Default fallback content --]
+[/#if]
+```
+
+The key string must match the constant defined in `APConstants` and the row in the `parameters` table. See `AGENTS.md` for the full specificity implementation guide.
+
+## Constitutional rules for new UI work
+
+<Warning>
+Before adding a new form control or layout block, verify that an existing macro in `forms.ftl` or a domain-specific macro library already covers the use case. Raw HTML form fields that bypass `customForm` macros will not get field-error rendering, read-only mode, or `changedField` highlighting for free — you will have to re-implement those behaviors manually, and they will diverge from the rest of the UI over time.
+</Warning>
+
+<Tip>
+For any block that needs to be repeated or cloned (partner rows, deliverable tags, milestone associations), use the `isTemplate=true` macro pattern instead of building DOM nodes in JavaScript. This keeps the rendering logic in FTL where it belongs and makes server-side validation straightforward because the OGNL binding paths follow a predictable index pattern.
+</Tip>
+
+## Composition checklist for a new page
+
+When adding a new full-page FTL template:
+
+- [ ] Open with `[#ftl]` and set `title`, `customJS`, `customCSS`, and `breadCrumb` variables.
+- [ ] Include `header.ftl` (which makes `customForm` available) and `main-menu.ftl`.
+- [ ] Include the domain-specific `menu-<area>.ftl` and `messages-<area>.ftl` partials.
+- [ ] Wrap form content in `[@s.form action=actionName method="POST" ...]`.
+- [ ] Use `[@customForm.input]`, `[@customForm.textArea]`, `[@customForm.select]` for all form controls.
+- [ ] Use `isTemplate=true` for any repeatable dynamic block.
+- [ ] Import domain macro libraries only after `header.ftl` has been included.
+- [ ] Close with `[#include "/WEB-INF/global/pages/footer.ftl" /]`.
